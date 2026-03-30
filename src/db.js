@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   nickname TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('${ROLES.BUYER}', '${ROLES.SELLER}', '${ROLES.ADMIN}')),
+  role TEXT NOT NULL DEFAULT '${ROLES.USER}',
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

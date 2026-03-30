@@ -7,9 +7,7 @@ const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN || "7d";
 const SHIPPING_FEE = 2500;
 
 const ROLES = {
-  BUYER: "BUYER",
-  SELLER: "SELLER",
-  ADMIN: "ADMIN",
+  USER: "USER",
 };
 
 const PRODUCT_CATEGORIES = ["FOOD", "BEAUTY", "DRINK", "MEAL_KIT", "OTHER"];

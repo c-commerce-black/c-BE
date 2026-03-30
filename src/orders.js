@@ -2,7 +2,7 @@ const express = require("express");
 const { ORDER_STATUSES, SHIPPING_FEE } = require("./config");
 const { db, getSellerProfileByUserId } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
-const { authenticate, requireSeller } = require("./auth");
+const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow } = require("./domain");
 const { createId, now } = require("./utils");
 
@@ -273,7 +273,6 @@ router.patch(
 
 router.patch(
   "/:id/status",
-  requireSeller,
   asyncHandler(async (req, res) => {
     const order = selectOrderById.get(req.params.id);
     if (!order) {

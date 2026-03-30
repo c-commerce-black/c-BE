@@ -69,22 +69,13 @@ const authenticate = (req, res, next) => {
   }
 };
 
-const requireSeller = (req, res, next) => {
-  if (!req.user || ![ROLES.SELLER, ROLES.ADMIN].includes(req.user.role)) {
-    return next(new AppError("Seller access is required", 403));
-  }
-
-  return next();
-};
-
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { email, nickname, password, role, shopName } = req.body || {};
+    const { email, nickname, password, shopName } = req.body || {};
 
     const normalizedEmail = normalizeEmail(email);
     const normalizedNickname = normalizeNickname(nickname);
-    const normalizedRole = role === ROLES.SELLER ? ROLES.SELLER : ROLES.BUYER;
 
     if (!normalizedEmail || !normalizedNickname || !password) {
       throw new AppError("email, nickname, and password are required", 400);
@@ -115,19 +106,19 @@ router.post(
       normalizedEmail,
       normalizedNickname,
       bcrypt.hashSync(String(password), 10),
-      normalizedRole,
+      ROLES.USER,
       currentTime,
       currentTime,
     );
 
-    if (normalizedRole === ROLES.SELLER) {
-      db.prepare(
-        `
-          INSERT INTO seller_profiles (id, user_id, shop_name, created_at)
-          VALUES (?, ?, ?, ?)
-        `,
-      ).run(createId(), userId, String(shopName || `${normalizedNickname} Shop`).trim(), currentTime);
-    }
+    // 누구나 판매할 수 있도록 seller_profile 자동 생성 (당근마켓 방식)
+    const resolvedShopName = String(shopName || `${normalizedNickname} Shop`).trim();
+    db.prepare(
+      `
+        INSERT INTO seller_profiles (id, user_id, shop_name, created_at)
+        VALUES (?, ?, ?, ?)
+      `,
+    ).run(createId(), userId, resolvedShopName, currentTime);
 
     const createdUser = getAuthenticatedUser(userId);
 
@@ -185,6 +176,5 @@ router.get(
 
 module.exports = {
   authenticate,
-  requireSeller,
   router,
 };

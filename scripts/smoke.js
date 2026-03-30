@@ -23,8 +23,6 @@ const run = async () => {
         email: sellerEmail,
         nickname: "seller",
         password: "password123",
-        role: "SELLER",
-        shopName: "Seller Shop",
       }),
     });
 

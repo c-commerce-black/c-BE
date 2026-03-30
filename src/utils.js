@@ -15,7 +15,6 @@ const sanitizeUser = (user) => {
     id: user.id,
     email: user.email,
     nickname: user.nickname,
-    role: user.role,
     createdAt: user.created_at,
     sellerProfileId: user.seller_profile_id || null,
     shopName: user.shop_name || null,

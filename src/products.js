@@ -2,7 +2,7 @@ const express = require("express");
 const { PRODUCT_CATEGORIES } = require("./config");
 const { db, getSellerProfileByUserId } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
-const { authenticate, requireSeller } = require("./auth");
+const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow, parseDateInput } = require("./domain");
 const { syncProductSnapshotById } = require("./productPricing");
 const { createId, now, parseInteger, parsePagination, pickFields } = require("./utils");
@@ -27,10 +27,16 @@ const selectPriceHistory = db.prepare(
   `SELECT d_day, price, created_at FROM price_history WHERE product_id = ? ORDER BY created_at DESC`,
 );
 
-const ensureSellerProfile = (userId) => {
-  const sellerProfile = getSellerProfileByUserId.get(userId);
+const ensureSellerProfile = (userId, nickname) => {
+  let sellerProfile = getSellerProfileByUserId.get(userId);
   if (!sellerProfile) {
-    throw new AppError("판매자 등록이 필요합니다.", 403);
+    // 판매자 프로필이 없으면 자동 생성 (당근마켓 방식 - 누구나 판매 가능)
+    const profileId = createId();
+    const shopName = `${nickname || "사용자"} Shop`;
+    db.prepare(
+      `INSERT INTO seller_profiles (id, user_id, shop_name, created_at) VALUES (?, ?, ?, ?)`
+    ).run(profileId, userId, shopName, now());
+    sellerProfile = getSellerProfileByUserId.get(userId);
   }
   return sellerProfile;
 };
@@ -120,12 +126,12 @@ productsRouter.get(
   }),
 );
 
-sellerProductsRouter.use(authenticate, requireSeller);
+sellerProductsRouter.use(authenticate);
 
 sellerProductsRouter.post(
   "/",
   asyncHandler(async (req, res) => {
-    const sellerProfile = ensureSellerProfile(req.user.id);
+    const sellerProfile = ensureSellerProfile(req.user.id, req.user.nickname);
     const { name, description, category, originalPrice, stock, expiryDate, imageUrl } = req.body || {};
 
     if (!name || !category || originalPrice === undefined || stock === undefined || !expiryDate) {
@@ -191,7 +197,7 @@ sellerProductsRouter.post(
 sellerProductsRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const sellerProfile = ensureSellerProfile(req.user.id);
+    const sellerProfile = ensureSellerProfile(req.user.id, req.user.nickname);
     const row = selectProductById.get(req.params.id);
 
     if (!row || row.seller_id !== sellerProfile.id || row.deleted_at) {
@@ -268,7 +274,7 @@ sellerProductsRouter.patch(
 sellerProductsRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const sellerProfile = ensureSellerProfile(req.user.id);
+    const sellerProfile = ensureSellerProfile(req.user.id, req.user.nickname);
     const row = selectProductById.get(req.params.id);
 
     if (!row || row.seller_id !== sellerProfile.id || row.deleted_at) {
@@ -287,7 +293,7 @@ sellerProductsRouter.delete(
 sellerProductsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
-    const sellerProfile = ensureSellerProfile(req.user.id);
+    const sellerProfile = ensureSellerProfile(req.user.id, req.user.nickname);
     const { page, limit, offset } = parsePagination(req.query);
     const rows = selectProductRows.all().filter((row) => row.seller_id === sellerProfile.id);
     const decorated = rows.map((row) => decorateProductRow(row));
