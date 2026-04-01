@@ -72,7 +72,7 @@ const authenticate = (req, res, next) => {
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
-    const { email, nickname, password, shopName } = req.body || {};
+    const { email, nickname, password, shopName, agreements } = req.body || {};
 
     const normalizedEmail = normalizeEmail(email);
     const normalizedNickname = normalizeNickname(nickname);
@@ -91,6 +91,16 @@ router.post(
 
     if (getUserByEmail.get(normalizedEmail)) {
       throw new AppError("Email already exists", 409);
+    }
+
+    // 약관 동의 검증 (agreements가 주어진 경우에만)
+    if (agreements !== undefined) {
+      if (!agreements.terms) {
+        throw new AppError("서비스 이용약관에 동의가 필요합니다.", 400);
+      }
+      if (!agreements.privacy) {
+        throw new AppError("개인정보 처리방침에 동의가 필요합니다.", 400);
+      }
     }
 
     const currentTime = now();
@@ -119,6 +129,20 @@ router.post(
         VALUES (?, ?, ?, ?)
       `,
     ).run(createId(), userId, resolvedShopName, currentTime);
+
+    // 약관 동의 저장 (agreements가 주어진 경우에만)
+    if (agreements !== undefined) {
+      db.prepare(
+        `INSERT INTO user_agreements (id, user_id, terms, privacy, marketing, agreed_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(
+        createId(),
+        userId,
+        agreements.terms ? 1 : 0,
+        agreements.privacy ? 1 : 0,
+        agreements.marketing ? 1 : 0,
+        currentTime,
+      );
+    }
 
     const createdUser = getAuthenticatedUser(userId);
 
