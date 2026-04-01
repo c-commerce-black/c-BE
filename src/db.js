@@ -117,6 +117,16 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerts_user_id ON alerts(user_id);
+
+CREATE TABLE IF NOT EXISTS user_agreements (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  terms INTEGER NOT NULL CHECK (terms IN (0, 1)),
+  privacy INTEGER NOT NULL CHECK (privacy IN (0, 1)),
+  marketing INTEGER NOT NULL DEFAULT 0 CHECK (marketing IN (0, 1)),
+  agreed_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 `;
 
 const db = new Database(DB_PATH);
