@@ -46,7 +46,15 @@ const applyListFilters = (rows, query) => {
     .map((row) => ({ row, decorated: decorateProductRow(row) }))
     .filter(({ decorated }) => !["DELETED", "EXPIRED"].includes(decorated.status))
     .filter(({ decorated }) => !query.category || decorated.category === query.category)
-    .filter(({ decorated }) => !query.status || decorated.status === query.status);
+    .filter(({ decorated }) => !query.status || decorated.status === query.status)
+    .filter(({ decorated }) => {
+      if (!query.q) return true;
+      const q = query.q.toLowerCase();
+      return (
+        decorated.name.toLowerCase().includes(q) ||
+        (decorated.sellerShopName && decorated.sellerShopName.toLowerCase().includes(q))
+      );
+    });
 
   const sort = query.sort || "expiry_asc";
 
