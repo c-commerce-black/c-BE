@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const { swaggerUi, swaggerSpec } = require("./swagger");
 const { router: authRouter } = require("./auth");
 const { productsRouter, sellerProductsRouter } = require("./products");
 const { router: cartRouter } = require("./cart");
@@ -13,6 +14,16 @@ const app = express();
 
 app.use(express.json());
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     summary: 상태 확인 (Health Check)
+ *     description: API 서버의 현재 상태를 반환합니다.
+ *     responses:
+ *       200:
+ *         description: 서버가 정상 작동 중입니다.
+ */
 app.get("/health", (req, res) => {
   res.json({ success: true, data: { status: "ok" } });
 });
@@ -27,6 +38,8 @@ app.use("/api/cart", cartRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/alerts", alertsRouter);
 app.use("/api/uploads", uploadsRouter);
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use(notFoundHandler);
 app.use(errorHandler);
