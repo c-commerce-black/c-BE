@@ -69,6 +69,33 @@ const authenticate = (req, res, next) => {
   }
 };
 
+/**
+ * @openapi
+ * /api/auth/register:
+ *   post:
+ *     summary: 회원가입
+ *     description: 새로운 사용자를 등록합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email: { type: string }
+ *               nickname: { type: string }
+ *               password: { type: string }
+ *               shopName: { type: string }
+ *               agreements:
+ *                 type: object
+ *                 properties:
+ *                   terms: { type: boolean }
+ *                   privacy: { type: boolean }
+ *                   marketing: { type: boolean }
+ *     responses:
+ *       201:
+ *         description: 회원가입 성공
+ */
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
@@ -153,6 +180,25 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: 로그인
+ *     description: 사용자를 인증하고 액세스 토큰을 발급합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email: { type: string }
+ *               password: { type: string }
+ *     responses:
+ *       200:
+ *         description: 로그인 성공
+ */
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
@@ -176,6 +222,18 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/auth/logout:
+ *   post:
+ *     summary: 로그아웃
+ *     description: 인증된 사용자를 로그아웃 처리합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 로그아웃 성공
+ */
 router.post(
   "/logout",
   authenticate,
@@ -187,6 +245,18 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     summary: 내 정보 조회
+ *     description: 인증된 사용자의 정보를 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 내 정보 반환
+ */
 router.get(
   "/me",
   authenticate,

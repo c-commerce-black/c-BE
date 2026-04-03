@@ -77,6 +77,16 @@ const applyListFilters = (rows, query) => {
   return filteredRows.map(({ decorated }) => decorated);
 };
 
+/**
+ * @openapi
+ * /api/products:
+ *   get:
+ *     summary: 상품 목록 조회
+ *     description: 페이지네이션이 적용된 상품 목록을 조회합니다.
+ *     responses:
+ *       200:
+ *         description: 상품 목록을 성공적으로 반환했습니다.
+ */
 productsRouter.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -99,6 +109,22 @@ productsRouter.get(
   }),
 );
 
+/**
+ * @openapi
+ * /api/products/{id}:
+ *   get:
+ *     summary: 상품 상세 조회
+ *     description: 특정 상품의 상세 정보와 가격 변동 내역을 조회합니다.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 상품 상세 정보 반환
+ */
 productsRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -136,6 +162,32 @@ productsRouter.get(
 
 sellerProductsRouter.use(authenticate);
 
+/**
+ * @openapi
+ * /api/seller/products:
+ *   post:
+ *     summary: 판매자 상품 등록
+ *     description: 판매자가 새로운 상품을 등록합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               category: { type: string }
+ *               originalPrice: { type: integer }
+ *               stock: { type: integer }
+ *               expiryDate: { type: string }
+ *               imageUrl: { type: string }
+ *     responses:
+ *       201:
+ *         description: 상품 등록 성공
+ */
 sellerProductsRouter.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -202,6 +254,38 @@ sellerProductsRouter.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/seller/products/{id}:
+ *   patch:
+ *     summary: 판매자 상품 수정
+ *     description: 판매자가 등록한 상품의 정보를 수정합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               description: { type: string }
+ *               category: { type: string }
+ *               originalPrice: { type: integer }
+ *               stock: { type: integer }
+ *               expiryDate: { type: string }
+ *               imageUrl: { type: string }
+ *     responses:
+ *       200:
+ *         description: 상품 수정 성공
+ */
 sellerProductsRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -279,6 +363,24 @@ sellerProductsRouter.patch(
   }),
 );
 
+/**
+ * @openapi
+ * /api/seller/products/{id}:
+ *   delete:
+ *     summary: 판매자 상품 삭제
+ *     description: 판매자가 등록한 상품을 삭제 처리합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 상품 삭제 성공
+ */
 sellerProductsRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -298,6 +400,18 @@ sellerProductsRouter.delete(
   }),
 );
 
+/**
+ * @openapi
+ * /api/seller/products:
+ *   get:
+ *     summary: 판매자 내 상품 목록 조회
+ *     description: 판매자가 등록한 전체 상품 목록과 요약 통계를 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 상품 목록 및 통계 반환
+ */
 sellerProductsRouter.get(
   "/",
   asyncHandler(async (req, res) => {

@@ -66,6 +66,18 @@ const buildCartResponse = (userId) => {
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/cart:
+ *   get:
+ *     summary: 장바구니 조회
+ *     description: 로그인한 사용자의 장바구니 항목과 결제 요약 정보를 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 장바구니 정보 반환
+ */
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -76,6 +88,27 @@ router.get(
   }),
 );
 
+/**
+ * @openapi
+ * /api/cart:
+ *   post:
+ *     summary: 장바구니 상품 추가
+ *     description: 특정 상품을 장바구니에 추가합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               productId: { type: string }
+ *               quantity: { type: integer }
+ *     responses:
+ *       201:
+ *         description: 장바구니 추가 성공
+ */
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -135,6 +168,32 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/cart/{cartItemId}:
+ *   patch:
+ *     summary: 장바구니 항목 수량 변경
+ *     description: 장바구니에 담긴 상품의 수량을 변경합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: cartItemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity: { type: integer }
+ *     responses:
+ *       200:
+ *         description: 수량 변경 성공
+ */
 router.patch(
   "/:cartItemId",
   asyncHandler(async (req, res) => {
@@ -168,6 +227,24 @@ router.patch(
   }),
 );
 
+/**
+ * @openapi
+ * /api/cart/{cartItemId}:
+ *   delete:
+ *     summary: 장바구니 항목 삭제
+ *     description: 장바구니에서 특정 항목을 삭제합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: cartItemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 삭제 성공
+ */
 router.delete(
   "/:cartItemId",
   asyncHandler(async (req, res) => {
@@ -183,6 +260,18 @@ router.delete(
   }),
 );
 
+/**
+ * @openapi
+ * /api/cart:
+ *   delete:
+ *     summary: 장바구니 전체 비우기
+ *     description: 장바구니의 모든 항목을 삭제합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 비우기 성공
+ */
 router.delete(
   "/",
   asyncHandler(async (req, res) => {

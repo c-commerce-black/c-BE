@@ -147,6 +147,29 @@ const cancelOrderTransaction = db.transaction(({ order, items }) => {
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/orders:
+ *   post:
+ *     summary: 주문 생성 (결제)
+ *     description: 장바구니 항목들을 바탕으로 새로운 주문을 생성합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cartItemIds: 
+ *                 type: array
+ *                 items: { type: string }
+ *               shippingAddress: { type: string }
+ *     responses:
+ *       201:
+ *         description: 주문 생성 성공
+ */
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -185,6 +208,18 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/orders:
+ *   get:
+ *     summary: 내 주문 목록 조회
+ *     description: 사용자의 이전 주문 내역을 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 주문 목록 반환
+ */
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -216,6 +251,24 @@ router.get(
   }),
 );
 
+/**
+ * @openapi
+ * /api/orders/{id}:
+ *   get:
+ *     summary: 주문 상세 조회
+ *     description: 특정 주문의 상세 정보를 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 주문 상세 정보 반환
+ */
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -244,6 +297,24 @@ router.get(
   }),
 );
 
+/**
+ * @openapi
+ * /api/orders/{id}/cancel:
+ *   patch:
+ *     summary: 주문 취소
+ *     description: PENDING 상태의 주문을 취소합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 주문 취소 성공
+ */
 router.patch(
   "/:id/cancel",
   asyncHandler(async (req, res) => {
@@ -271,6 +342,32 @@ router.patch(
   }),
 );
 
+/**
+ * @openapi
+ * /api/orders/{id}/status:
+ *   patch:
+ *     summary: 주문 상태 변경
+ *     description: 판매자가 자신의 상품이 포함된 주문의 상태를 변경합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status: { type: string, enum: [PREPARING, SHIPPING, DELIVERED] }
+ *     responses:
+ *       200:
+ *         description: 상태 변경 성공
+ */
 router.patch(
   "/:id/status",
   asyncHandler(async (req, res) => {

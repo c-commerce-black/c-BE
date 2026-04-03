@@ -17,6 +17,18 @@ const selectProductById = db.prepare(`
 
 router.use(authenticate);
 
+/**
+ * @openapi
+ * /api/alerts:
+ *   get:
+ *     summary: 알림 목록 조회
+ *     description: 사용자의 찜 알림 목록과 오늘의 특가 알림을 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 알림 목록 반환
+ */
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -72,6 +84,26 @@ router.get(
   }),
 );
 
+/**
+ * @openapi
+ * /api/alerts:
+ *   post:
+ *     summary: 상품 찜(알림) 추가
+ *     description: 특정 상품을 찜 목록에 추가합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               productId: { type: string }
+ *     responses:
+ *       201:
+ *         description: 찜 추가 성공
+ */
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -100,6 +132,24 @@ router.post(
   }),
 );
 
+/**
+ * @openapi
+ * /api/alerts/{alertId}/toggle:
+ *   patch:
+ *     summary: 찜 알림 토글
+ *     description: 알림 설정(켜기/끄기)을 토글합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: alertId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 알림 설정 변경 성공
+ */
 router.patch(
   "/:alertId/toggle",
   asyncHandler(async (req, res) => {
@@ -118,6 +168,24 @@ router.patch(
   }),
 );
 
+/**
+ * @openapi
+ * /api/alerts/{alertId}:
+ *   delete:
+ *     summary: 찜(알림) 삭제
+ *     description: 지정된 알림을 삭제합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: alertId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 찜 삭제 성공
+ */
 router.delete(
   "/:alertId",
   asyncHandler(async (req, res) => {
