@@ -90,6 +90,26 @@ try {
 }
 
 // POST /api/uploads/images
+/**
+ * @openapi
+ * /api/uploads/images:
+ *   post:
+ *     summary: 이미지 업로드
+ *     description: 이미지 파일을 업로드합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: 이미지 업로드 성공
+ */
 router.post(
   "/images",
   (req, res, next) => {
