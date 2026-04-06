@@ -39,7 +39,7 @@ app.use("/api/orders", ordersRouter);
 app.use("/api/alerts", alertsRouter);
 app.use("/api/uploads", uploadsRouter);
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api-docs", ...swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use(notFoundHandler);
 app.use(errorHandler);

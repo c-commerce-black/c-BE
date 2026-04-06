@@ -11,8 +11,12 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:8000',
-        description: '개발 서버',
+        url: 'http://localhost:3000',
+        description: '로컬 개발 서버',
+      },
+      {
+        url: 'https://port-0-commerce-be-mmveg06487ac90d1.sel3.cloudtype.app',
+        description: '클라우드타입 배포 서버',
       },
     ],
     components: {
