@@ -5,7 +5,7 @@ const { AppError, asyncHandler } = require("./errors");
 const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow, parseDateInput } = require("./domain");
 const { syncProductSnapshotById } = require("./productPricing");
-const { createId, now, parseInteger, parsePagination, pickFields } = require("./utils");
+const { createId, getPublicOrigin, now, parseInteger, parsePagination, pickFields } = require("./utils");
 
 const productsRouter = express.Router();
 const sellerProductsRouter = express.Router();
@@ -41,9 +41,9 @@ const ensureSellerProfile = (userId, nickname) => {
   return sellerProfile;
 };
 
-const applyListFilters = (rows, query) => {
+const applyListFilters = (rows, query, options = {}) => {
   const filteredRows = rows
-    .map((row) => ({ row, decorated: decorateProductRow(row) }))
+    .map((row) => ({ row, decorated: decorateProductRow(row, options) }))
     .filter(({ decorated }) => !["DELETED", "EXPIRED"].includes(decorated.status))
     .filter(({ decorated }) => !query.category || decorated.category === query.category)
     .filter(({ decorated }) => !query.status || decorated.status === query.status)
@@ -92,7 +92,7 @@ productsRouter.get(
   asyncHandler(async (req, res) => {
     const { page, limit, offset } = parsePagination(req.query);
     const rows = selectProductRows.all();
-    const products = applyListFilters(rows, req.query);
+    const products = applyListFilters(rows, req.query, { publicOrigin: getPublicOrigin(req) });
 
     res.json({
       success: true,
@@ -134,7 +134,7 @@ productsRouter.get(
       throw new AppError("상품을 찾을 수 없습니다.", 404);
     }
 
-    const decoratedProduct = decorateProductRow(row);
+    const decoratedProduct = decorateProductRow(row, { publicOrigin: getPublicOrigin(req) });
 
     if (decoratedProduct.status === "DELETED") {
       throw new AppError("상품을 찾을 수 없습니다.", 404);

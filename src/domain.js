@@ -1,4 +1,5 @@
 const { PRODUCT_STATUSES } = require("./config");
+const { toPublicUrl } = require("./utils");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -88,7 +89,7 @@ const buildProductState = (row) => {
   };
 };
 
-const decorateProductRow = (row) => {
+const decorateProductRow = (row, options = {}) => {
   const state = buildProductState(row);
 
   return {
@@ -102,7 +103,7 @@ const decorateProductRow = (row) => {
     stock: row.stock,
     expiryDate: formatDate(row.expiry_date),
     dDay: state.dDay,
-    imageUrl: row.image_url,
+    imageUrl: toPublicUrl(row.image_url, options.publicOrigin),
     status: state.status,
     sellerShopName: row.shop_name || null,
   };

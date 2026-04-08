@@ -4,7 +4,7 @@ const { db } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
 const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow } = require("./domain");
-const { createId, now, parseInteger } = require("./utils");
+const { createId, getPublicOrigin, now, parseInteger } = require("./utils");
 
 const router = express.Router();
 
@@ -32,10 +32,10 @@ const selectExistingCartItem = db.prepare(
   `SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?`,
 );
 
-const buildCartResponse = (userId) => {
+const buildCartResponse = (userId, publicOrigin) => {
   const rows = selectCartRows.all(userId);
   const items = rows.map((row) => {
-    const product = decorateProductRow(row);
+    const product = decorateProductRow(row, { publicOrigin });
     return {
       cartItemId: row.id,
       quantity: row.quantity,
@@ -83,7 +83,7 @@ router.get(
   asyncHandler(async (req, res) => {
     res.json({
       success: true,
-      data: buildCartResponse(req.user.id),
+      data: buildCartResponse(req.user.id, getPublicOrigin(req)),
     });
   }),
 );

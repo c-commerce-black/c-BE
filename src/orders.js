@@ -4,7 +4,7 @@ const { db, getSellerProfileByUserId } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
 const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow } = require("./domain");
-const { createId, now } = require("./utils");
+const { createId, getPublicOrigin, now, toPublicUrl } = require("./utils");
 
 const router = express.Router();
 
@@ -30,30 +30,33 @@ const selectCartItemsByIds = (userId, cartItemIds) => {
   return statement.all(userId, ...cartItemIds);
 };
 
-const formatOrderItems = (orderId) =>
+const formatOrderItems = (orderId, publicOrigin) =>
   selectOrderItems.all(orderId).map((row) => {
     if (!row.product_id || row.deleted_at) {
       return {
         productId: row.product_id,
         name: row.name_snapshot,
-        imageUrl: row.image_url_snapshot,
+        imageUrl: toPublicUrl(row.image_url_snapshot, publicOrigin),
         quantity: row.quantity,
         price: row.price,
         dDay: null,
       };
     }
 
-    const decoratedProduct = decorateProductRow({
-      ...row,
-      name: row.name_snapshot,
-      original_price: row.original_price,
-      image_url: row.image_url,
-    });
+    const decoratedProduct = decorateProductRow(
+      {
+        ...row,
+        name: row.name_snapshot,
+        original_price: row.original_price,
+        image_url: row.image_url,
+      },
+      { publicOrigin },
+    );
 
     return {
       productId: row.product_id,
       name: row.name_snapshot,
-      imageUrl: row.image_url_snapshot || row.image_url,
+      imageUrl: toPublicUrl(row.image_url_snapshot || row.image_url, publicOrigin),
       quantity: row.quantity,
       price: row.price,
       dDay: decoratedProduct.dDay,
@@ -187,7 +190,7 @@ router.post(
     });
 
     const order = selectUserOrder.get(orderId, req.user.id);
-    const items = formatOrderItems(orderId);
+    const items = formatOrderItems(orderId, getPublicOrigin(req));
 
     res.status(201).json({
       success: true,
@@ -223,12 +226,13 @@ router.post(
 router.get(
   "/",
   asyncHandler(async (req, res) => {
+    const publicOrigin = getPublicOrigin(req);
     const orders = selectUserOrders.all(req.user.id).map((order) => ({
       id: order.id,
       status: order.status,
       finalAmount: order.final_amount,
       createdAt: order.created_at,
-      items: formatOrderItems(order.id).map((item) => ({
+      items: formatOrderItems(order.id, publicOrigin).map((item) => ({
         productId: item.productId,
         name: item.name,
         quantity: item.quantity,
@@ -290,7 +294,7 @@ router.get(
           shippingAddress: order.shipping_address,
           createdAt: order.created_at,
           updatedAt: order.updated_at,
-          items: formatOrderItems(order.id),
+          items: formatOrderItems(order.id, getPublicOrigin(req)),
         },
       },
     });

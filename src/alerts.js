@@ -3,7 +3,7 @@ const { db } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
 const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow, getRemainSeconds } = require("./domain");
-const { createId, now } = require("./utils");
+const { createId, getPublicOrigin, now } = require("./utils");
 
 const router = express.Router();
 
@@ -32,6 +32,8 @@ router.use(authenticate);
 router.get(
   "/",
   asyncHandler(async (req, res) => {
+    const publicOrigin = getPublicOrigin(req);
+
     const wishAlerts = db
       .prepare(
         `
@@ -48,7 +50,7 @@ router.get(
         alertId: row.alert_id,
         isOn: Boolean(row.is_on),
         product: {
-          ...decorateProductRow(row),
+          ...decorateProductRow(row, { publicOrigin }),
           remainSeconds: getRemainSeconds(row.expiry_date),
         },
       }));
@@ -72,7 +74,7 @@ router.get(
         alertId: row.alert_id || null,
         isOn: row.alert_id ? Boolean(row.is_on) : false,
         product: {
-          ...decorateProductRow(row),
+          ...decorateProductRow(row, { publicOrigin }),
           remainSeconds: getRemainSeconds(row.expiry_date),
         },
       }));

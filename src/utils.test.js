@@ -1,4 +1,13 @@
-const { parseInteger, parsePagination, pickFields, normalizeEmail, normalizeNickname, sanitizeUser } = require("./utils");
+const {
+  getPublicOrigin,
+  normalizeEmail,
+  normalizeNickname,
+  parseInteger,
+  parsePagination,
+  pickFields,
+  sanitizeUser,
+  toPublicUrl,
+} = require("./utils");
 
 describe("parseInteger", () => {
   test("정상 정수값을 파싱한다", () => {
@@ -139,5 +148,48 @@ describe("sanitizeUser", () => {
     const result = sanitizeUser(row);
     expect(result.sellerProfileId).toBe("sp-1");
     expect(result.shopName).toBe("마트");
+  });
+});
+
+describe("getPublicOrigin", () => {
+  test("프록시 헤더가 있으면 public origin을 우선 사용한다", () => {
+    const req = {
+      protocol: "http",
+      get: (name) =>
+        ({
+          "x-forwarded-proto": "https",
+          "x-forwarded-host": "api.example.com",
+          host: "127.0.0.1:3000",
+        })[name],
+    };
+
+    expect(getPublicOrigin(req)).toBe("https://api.example.com");
+  });
+
+  test("프록시 헤더가 없으면 요청 protocol과 host를 사용한다", () => {
+    const req = {
+      protocol: "http",
+      get: (name) =>
+        ({
+          host: "127.0.0.1:3000",
+        })[name],
+    };
+
+    expect(getPublicOrigin(req)).toBe("http://127.0.0.1:3000");
+  });
+});
+
+describe("toPublicUrl", () => {
+  test("절대 URL은 그대로 유지한다", () => {
+    expect(toPublicUrl("https://cdn.example.com/a.png", "http://127.0.0.1:3000")).toBe("https://cdn.example.com/a.png");
+  });
+
+  test("상대 경로는 public origin 기준 절대 URL로 바꾼다", () => {
+    expect(toPublicUrl("/uploads/a.png", "http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000/uploads/a.png");
+  });
+
+  test("빈 값은 null로 정규화한다", () => {
+    expect(toPublicUrl("", "http://127.0.0.1:3000")).toBeNull();
+    expect(toPublicUrl(null, "http://127.0.0.1:3000")).toBeNull();
   });
 });

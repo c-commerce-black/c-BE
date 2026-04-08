@@ -54,8 +54,40 @@ const pickFields = (source, keys) =>
     return accumulator;
   }, {});
 
+const getPublicOrigin = (req) => {
+  const forwardedProto = req.get("x-forwarded-proto");
+  const forwardedHost = req.get("x-forwarded-host");
+  const protocol = (forwardedProto ? forwardedProto.split(",")[0] : req.protocol || "http").trim();
+  const host = (forwardedHost ? forwardedHost.split(",")[0] : req.get("host")).trim();
+
+  return `${protocol}://${host}`;
+};
+
+const toPublicUrl = (value, publicOrigin) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const normalizedValue = String(value).trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  if (/^[a-z][a-z\d+\-.]*:\/\//i.test(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  if (!publicOrigin) {
+    return normalizedValue;
+  }
+
+  const pathname = normalizedValue.startsWith("/") ? normalizedValue : `/${normalizedValue}`;
+  return new URL(pathname, publicOrigin).toString();
+};
+
 module.exports = {
   createId,
+  getPublicOrigin,
   normalizeEmail,
   normalizeNickname,
   now,
@@ -63,4 +95,5 @@ module.exports = {
   parsePagination,
   pickFields,
   sanitizeUser,
+  toPublicUrl,
 };
