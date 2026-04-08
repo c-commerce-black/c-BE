@@ -6,6 +6,15 @@ const { AppError, asyncHandler } = require("./errors");
 
 const router = express.Router();
 
+const getPublicOrigin = (req) => {
+  const forwardedProto = req.get("x-forwarded-proto");
+  const forwardedHost = req.get("x-forwarded-host");
+  const protocol = (forwardedProto ? forwardedProto.split(",")[0] : req.protocol || "http").trim();
+  const host = (forwardedHost ? forwardedHost.split(",")[0] : req.get("host")).trim();
+
+  return `${protocol}://${host}`;
+};
+
 // ──────────────────────────────────────────────
 // Local 드라이버: data/uploads/ 에 저장, /uploads/ 로 서빙
 // ──────────────────────────────────────────────
@@ -34,7 +43,16 @@ const buildLocalUpload = () => {
     },
   });
 
-  return { upload, getResult: (req) => ({ imageUrl: `/uploads/${req.file.filename}`, key: req.file.filename }) };
+  return {
+    upload,
+    getResult: (req) => {
+      const pathname = `/uploads/${req.file.filename}`;
+      return {
+        imageUrl: new URL(pathname, getPublicOrigin(req)).toString(),
+        key: req.file.filename,
+      };
+    },
+  };
 };
 
 // ──────────────────────────────────────────────
