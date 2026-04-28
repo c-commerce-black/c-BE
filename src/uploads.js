@@ -6,6 +6,14 @@ const { AppError, asyncHandler } = require("./errors");
 
 const router = express.Router();
 
+const imageFileFilter = (_req, file, cb) => {
+  if (!file.mimetype || !file.mimetype.startsWith("image/")) {
+    return cb(new Error("이미지 파일만 업로드 가능합니다."));
+  }
+
+  cb(null, true);
+};
+
 // ──────────────────────────────────────────────
 // Local 드라이버: data/uploads/ 에 저장, /uploads/ 로 서빙
 // ──────────────────────────────────────────────
@@ -26,12 +34,7 @@ const buildLocalUpload = () => {
   const upload = multer({
     storage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-    fileFilter: (_req, file, cb) => {
-      if (!file.mimetype.startsWith("image/")) {
-        return cb(new AppError("이미지 파일만 업로드 가능합니다.", 400));
-      }
-      cb(null, true);
-    },
+    fileFilter: imageFileFilter,
   });
 
   return { upload, getResult: (req) => ({ imageUrl: `/uploads/${req.file.filename}`, key: req.file.filename }) };
@@ -63,12 +66,7 @@ const buildS3Upload = () => {
       },
     }),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-    fileFilter: (_req, file, cb) => {
-      if (!file.mimetype.startsWith("image/")) {
-        return cb(new AppError("이미지 파일만 업로드 가능합니다.", 400));
-      }
-      cb(null, true);
-    },
+    fileFilter: imageFileFilter,
   });
 
   return {
