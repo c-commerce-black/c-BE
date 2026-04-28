@@ -127,26 +127,6 @@ const createOrderTransaction = db.transaction(({ userId, cartItemIds, shippingAd
   return orderId;
 });
 
-const cancelOrderTransaction = db.transaction(({ order, items }) => {
-  const currentTime = now();
-  db.prepare(`UPDATE orders SET status = 'CANCELLED', cancelled_at = ?, updated_at = ? WHERE id = ?`).run(currentTime, currentTime, order.id);
-
-  const updateProduct = db.prepare(`UPDATE products SET stock = ?, current_price = ?, status = ?, updated_at = ? WHERE id = ?`);
-
-  for (const item of items) {
-    const product = db.prepare(`SELECT * FROM products WHERE id = ?`).get(item.product_id);
-    if (!product) {
-      continue;
-    }
-
-    const nextStock = product.stock + item.quantity;
-    const nextState = buildProductState({ ...product, stock: nextStock, deleted_at: product.deleted_at });
-    updateProduct.run(nextStock, nextState.currentPrice, nextState.status, currentTime, product.id);
-  }
-});
-
-router.use(authenticate);
-
 /**
  * @openapi
  * /api/orders:
