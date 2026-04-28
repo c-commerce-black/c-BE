@@ -60,6 +60,10 @@ describe("Sprint 3 API Tests (알림 + 스케줄러 + 배송상태 변경)", () 
   });
 
   afterAll((done) => {
+    if (!server) {
+      return done();
+    }
+
     server.close(done);
   });
 
