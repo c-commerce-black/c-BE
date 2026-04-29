@@ -6,8 +6,18 @@
     "start": "node src/server.js",
     "check": "node scripts/check.js",
     "smoke": "node scripts/smoke.js",
-    "test": "jest",
+    "test": "jest --runInBand --forceExit",
     "test:smoke": "npm run smoke"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "setupFiles": [
+      "./src/jestSetupFile.js"
+    ],
+    "testMatch": [
+      "**/src/**/*.test.js"
+    ]
   },
   "keywords": [],
   "author": "",
