@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { ACCESS_TOKEN_EXPIRES_IN, JWT_SECRET, ROLES } = require("./config");
 const { db, getUserByEmail, getUserWithSeller } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
+const { ensurePaymentProfile } = require("./payment-profiles");
 const { createId, normalizeEmail, normalizeNickname, now, sanitizeUser } = require("./utils");
 
 const router = express.Router();
@@ -172,6 +173,7 @@ router.post(
     }
 
     const createdUser = getAuthenticatedUser(userId);
+    ensurePaymentProfile(userId);
 
     res.status(201).json({
       success: true,

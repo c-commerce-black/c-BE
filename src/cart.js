@@ -9,7 +9,7 @@ const { createId, now, parseInteger } = require("./utils");
 const router = express.Router();
 
 const selectCartRows = db.prepare(`
-  SELECT ci.*, p.name, p.description, p.category, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.status, p.deleted_at, sp.shop_name
+  SELECT ci.*, p.id AS product_id, p.name, p.description, p.category, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.status, p.deleted_at, sp.shop_name
   FROM cart_items ci
   JOIN products p ON p.id = ci.product_id
   JOIN seller_profiles sp ON sp.id = p.seller_id
@@ -35,7 +35,10 @@ const selectExistingCartItem = db.prepare(
 const buildCartResponse = (userId) => {
   const rows = selectCartRows.all(userId);
   const items = rows.map((row) => {
-    const product = decorateProductRow(row);
+    const product = decorateProductRow({
+      ...row,
+      id: row.product_id,
+    });
     return {
       cartItemId: row.id,
       quantity: row.quantity,

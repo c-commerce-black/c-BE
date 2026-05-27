@@ -43,7 +43,7 @@
 | Screen 7 Cart Checkout | 장바구니/결제 | 장바구니 | 장바구니 아이템 리스트 | 수량/가격 변경 반영 | 미구현 | 완료 |
 | Screen 7 Cart Checkout | 장바구니/결제 | 가격 안내 | 가격 변동 경고 배너 | 임박 상품 가격 변동 사전 안내 | 미구현 | 완료 |
 | Screen 7 Cart Checkout | 장바구니/결제 | 정산 | 주문 요약 계산 | 상품금액/할인/배송비/총액 계산 | 미구현 | 완료 |
-| Screen 7 Cart Checkout | 장바구니/결제 | 결제 | 결제하기 CTA | 결제 성공 시 완료 화면 이동 | 미구현 | 완료 |
+| Screen 7 Cart Checkout | 장바구니/결제 | 결제 | 결제하기 CTA | stablecoin 기반 주문 결제 + 판매자별 정산 | 완료 | 완료 |
 | Screen 8 Order Confirmation | 주문 완료 | 완료 상태 | 주문 완료 메시지 노출 | 성공 아이콘 + 확정 메시지 | 미구현 | 완료 |
 | Screen 8 Order Confirmation | 주문 완료 | 주문 정보 | 주문 요약 정보 노출 | 구매 상품/최종 결제금액 | 미구현 | 완료 |
 | Screen 8 Order Confirmation | 주문 완료 | 배송 추적 | 배송 상태 스텝 | 준비중/배송중/완료 상태 표시 | 미구현 | 완료 |
@@ -60,3 +60,31 @@
 > **Base URL**: `http://localhost:3000`  
 > **Content-Type**: `application/json`  
 > **인증 방식**: Bearer Token (JWT)
+
+## 결제 연동 메모
+
+- 주문 생성과 결제는 분리되어 있습니다. `POST /api/orders` 후 `POST /api/orders/:id/pay` 를 호출합니다.
+- 구매자/판매자 지갑은 서버가 자동 발급하며, `GET /api/payments/profile` 로 조회할 수 있습니다.
+- 실제 stablecoin 연동 시 서명 규칙은 `stablecoin/docs/integration/request-signing.md` 기준으로 구현했습니다.
+- 로컬 기본값은 `STABLECOIN_DRIVER=mock` 이고, 실연동은 `STABLECOIN_DRIVER=stablecoin` 과 `STABLECOIN_PRIVATE_KEY_PEM` 등을 설정하면 됩니다.
+
+## 데모 계정/판매자 초기화
+
+```bash
+npm run bootstrap:demo
+```
+
+기본으로 아래를 맞춰 줍니다.
+
+- 구매자 계정 1개
+- 판매자 계정 1개
+- 각 계정의 `seller_profile`
+- 각 계정의 자동 발급 결제 지갑
+- 판매자 대표 상품 1개
+
+환경 변수로 계정/상품 값을 바꿀 수 있습니다.
+
+- `BUYER_EMAIL`, `BUYER_PASSWORD`, `BUYER_NICKNAME`, `BUYER_SHOP_NAME`
+- `SELLER_EMAIL`, `SELLER_PASSWORD`, `SELLER_NICKNAME`, `SELLER_SHOP_NAME`
+- `DEMO_PRODUCT_NAME`, `DEMO_PRODUCT_DESCRIPTION`, `DEMO_PRODUCT_CATEGORY`
+- `DEMO_PRODUCT_PRICE`, `DEMO_PRODUCT_STOCK`, `DEMO_PRODUCT_EXPIRY`

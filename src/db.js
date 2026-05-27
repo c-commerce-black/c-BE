@@ -1,7 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
-const { DB_PATH, ORDER_STATUSES, PRODUCT_CATEGORIES, PRODUCT_STATUSES, ROLES } = require("./config");
+const {
+  DB_PATH,
+  ORDER_PAYMENT_STATUSES,
+  ORDER_STATUSES,
+  PAYMENT_RECORD_STATUSES,
+  PRODUCT_CATEGORIES,
+  PRODUCT_STATUSES,
+  ROLES,
+} = require("./config");
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
@@ -75,6 +83,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('${ORDER_STATUSES.join("', '")}')),
+  payment_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('${ORDER_PAYMENT_STATUSES.join("', '")}')),
   total_amount INTEGER NOT NULL CHECK (total_amount >= 0),
   discount_amount INTEGER NOT NULL CHECK (discount_amount >= 0),
   shipping_fee INTEGER NOT NULL CHECK (shipping_fee >= 0),
@@ -82,6 +91,7 @@ CREATE TABLE IF NOT EXISTS orders (
   shipping_address TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  paid_at INTEGER,
   cancelled_at INTEGER,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -103,6 +113,46 @@ CREATE TABLE IF NOT EXISTS order_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+
+CREATE TABLE IF NOT EXISTS payment_profiles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  wallet_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_profiles_wallet_id ON payment_profiles(wallet_id);
+
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  seller_id TEXT NOT NULL,
+  payer_user_id TEXT NOT NULL,
+  payee_user_id TEXT NOT NULL,
+  src_wallet_id TEXT NOT NULL,
+  dst_wallet_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  reference_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL CHECK (status IN ('${PAYMENT_RECORD_STATUSES.join("', '")}')),
+  stablecoin_transfer_id TEXT,
+  error_message TEXT,
+  raw_response TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  paid_at INTEGER,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (seller_id) REFERENCES seller_profiles(id) ON DELETE CASCADE,
+  FOREIGN KEY (payer_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (payee_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id, created_at ASC);
+CREATE INDEX IF NOT EXISTS idx_payments_payer_user_id ON payments(payer_user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS alerts (
   id TEXT PRIMARY KEY,
@@ -134,6 +184,23 @@ db.pragma("foreign_keys = ON");
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 5000");
 db.exec(schemaSql);
+
+const hasColumn = (tableName, columnName) =>
+  db.prepare(`PRAGMA table_info(${tableName})`).all().some((column) => column.name === columnName);
+
+if (!hasColumn("orders", "payment_status")) {
+  db.exec(
+    `ALTER TABLE orders ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('${ORDER_PAYMENT_STATUSES.join("', '")}'))`,
+  );
+}
+
+if (!hasColumn("orders", "paid_at")) {
+  db.exec(`ALTER TABLE orders ADD COLUMN paid_at INTEGER`);
+}
+
+if (!hasColumn("payment_profiles", "balance")) {
+  db.exec(`ALTER TABLE payment_profiles ADD COLUMN balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0)`);
+}
 
 const getUserWithSeller = db.prepare(`
   SELECT

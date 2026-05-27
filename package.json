@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node src/server.js",
     "check": "node scripts/check.js",
+    "bootstrap:demo": "bash scripts/bootstrap-demo.sh",
     "smoke": "node scripts/smoke.js",
     "test": "jest",
     "test:smoke": "npm run smoke"

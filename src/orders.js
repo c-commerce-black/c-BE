@@ -4,6 +4,7 @@ const { db, getSellerProfileByUserId } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
 const { authenticate } = require("./auth");
 const { buildProductState, decorateProductRow } = require("./domain");
+const { executeOrderPayment, formatPaymentRecord, selectPaymentsByOrderId } = require("./payments");
 const { createId, now } = require("./utils");
 
 const router = express.Router();
@@ -11,7 +12,7 @@ const router = express.Router();
 const selectUserOrder = db.prepare(`SELECT * FROM orders WHERE id = ? AND user_id = ?`);
 const selectOrderById = db.prepare(`SELECT * FROM orders WHERE id = ?`);
 const selectOrderItems = db.prepare(`
-  SELECT oi.*, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.description, p.category, p.status, p.deleted_at, sp.shop_name
+  SELECT oi.*, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.description, p.category, p.status, p.deleted_at, sp.shop_name, sp.user_id AS seller_user_id
   FROM order_items oi
   LEFT JOIN products p ON p.id = oi.product_id
   LEFT JOIN seller_profiles sp ON sp.id = oi.seller_id
@@ -52,6 +53,8 @@ const formatOrderItems = (orderId) =>
 
     return {
       productId: row.product_id,
+      sellerId: row.seller_id,
+      sellerShopName: row.shop_name,
       name: row.name_snapshot,
       imageUrl: row.image_url_snapshot || row.image_url,
       quantity: row.quantity,
@@ -59,6 +62,22 @@ const formatOrderItems = (orderId) =>
       dDay: decoratedProduct.dDay,
     };
   });
+
+const formatOrder = (order) => ({
+  id: order.id,
+  status: order.status,
+  paymentStatus: order.payment_status,
+  totalAmount: order.total_amount,
+  discountAmount: order.discount_amount,
+  shippingFee: order.shipping_fee,
+  finalAmount: order.final_amount,
+  shippingAddress: order.shipping_address,
+  createdAt: order.created_at,
+  updatedAt: order.updated_at,
+  paidAt: order.paid_at,
+  items: formatOrderItems(order.id),
+  payments: selectPaymentsByOrderId.all(order.id).map(formatPaymentRecord),
+});
 
 const createOrderTransaction = db.transaction(({ userId, cartItemIds, shippingAddress }) => {
   const rows = selectCartItemsByIds(userId, cartItemIds);
@@ -193,14 +212,7 @@ router.post(
       success: true,
       data: {
         order: {
-          id: order.id,
-          status: order.status,
-          totalAmount: order.total_amount,
-          discountAmount: order.discount_amount,
-          shippingFee: order.shipping_fee,
-          finalAmount: order.final_amount,
-          shippingAddress: order.shipping_address,
-          createdAt: order.created_at,
+          ...formatOrder(order),
           items,
         },
       },
@@ -226,8 +238,10 @@ router.get(
     const orders = selectUserOrders.all(req.user.id).map((order) => ({
       id: order.id,
       status: order.status,
+      paymentStatus: order.payment_status,
       finalAmount: order.final_amount,
       createdAt: order.created_at,
+      paidAt: order.paid_at,
       items: formatOrderItems(order.id).map((item) => ({
         productId: item.productId,
         name: item.name,
@@ -280,18 +294,43 @@ router.get(
     res.json({
       success: true,
       data: {
-        order: {
-          id: order.id,
-          status: order.status,
-          totalAmount: order.total_amount,
-          discountAmount: order.discount_amount,
-          shippingFee: order.shipping_fee,
-          finalAmount: order.final_amount,
-          shippingAddress: order.shipping_address,
-          createdAt: order.created_at,
-          updatedAt: order.updated_at,
-          items: formatOrderItems(order.id),
-        },
+        order: formatOrder(order),
+      },
+    });
+  }),
+);
+
+/**
+ * @openapi
+ * /api/orders/{id}/pay:
+ *   post:
+ *     summary: 주문 결제
+ *     description: 등록된 stablecoin 결제 지갑 정보를 이용해 주문 금액을 판매자별로 정산합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 결제 처리 결과 반환
+ */
+router.post(
+  "/:id/pay",
+  asyncHandler(async (req, res) => {
+    const { order, payments } = await executeOrderPayment({
+      orderId: req.params.id,
+      payerUserId: req.user.id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        order: formatOrder(order),
+        payments: payments.map(formatPaymentRecord),
       },
     });
   }),
@@ -326,6 +365,10 @@ router.patch(
     if (order.status === "CANCELLED") {
       res.json({ success: true, data: { message: "주문이 취소되었습니다." } });
       return;
+    }
+
+    if (order.payment_status === "PAID" || order.payment_status === "PARTIAL") {
+      throw new AppError("결제 완료 또는 부분 결제된 주문은 아직 취소할 수 없습니다.", 400);
     }
 
     if (order.status !== "PENDING") {
@@ -381,6 +424,10 @@ router.patch(
       throw new AppError("status must be PREPARING, SHIPPING, or DELIVERED", 400);
     }
 
+    if (order.payment_status !== "PAID") {
+      throw new AppError("결제가 완료된 주문만 배송 상태를 변경할 수 있습니다.", 400);
+    }
+
     const sellerProfile = getSellerProfileByUserId.get(req.user.id);
     if (!sellerProfile) {
       throw new AppError("판매자 등록이 필요합니다.", 403);
@@ -404,11 +451,12 @@ router.patch(
       throw new AppError("허용되지 않는 상태 전이입니다.", 400);
     }
 
-    db.prepare(`UPDATE orders SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, now(), order.id);
+    const updatedAt = now();
+    db.prepare(`UPDATE orders SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, updatedAt, order.id);
     res.json({
       success: true,
       data: {
-        order: { id: order.id, status: nextStatus, updatedAt: now() },
+        order: { id: order.id, status: nextStatus, paymentStatus: order.payment_status, updatedAt },
       },
     });
   }),

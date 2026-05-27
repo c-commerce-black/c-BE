@@ -5,6 +5,7 @@ const { router: authRouter } = require("./auth");
 const { productsRouter, sellerProductsRouter } = require("./products");
 const { router: cartRouter } = require("./cart");
 const { router: ordersRouter } = require("./orders");
+const { router: paymentsRouter } = require("./payments");
 const { router: alertsRouter } = require("./alerts");
 const { router: uploadsRouter } = require("./uploads");
 const { errorHandler, notFoundHandler } = require("./errors");
@@ -36,6 +37,7 @@ app.use("/api/products", productsRouter);
 app.use("/api/seller/products", sellerProductsRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/orders", ordersRouter);
+app.use("/api/payments", paymentsRouter);
 app.use("/api/alerts", alertsRouter);
 app.use("/api/uploads", uploadsRouter);
 

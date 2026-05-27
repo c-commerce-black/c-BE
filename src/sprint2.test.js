@@ -87,6 +87,7 @@ describe("Sprint 2 API Tests (장바구니 관리 + 주문 관리)", () => {
     const payload = await res.json();
     expect(res.status).toBe(201);
     expect(payload.success).toBe(true);
+    expect(payload.data.order.paymentStatus).toBe("UNPAID");
     orderId = payload.data.order.id;
   });
 

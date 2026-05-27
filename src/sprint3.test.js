@@ -43,6 +43,18 @@ describe("Sprint 3 API Tests (알림 + 스케줄러 + 배송상태 변경)", () 
     });
     buyerToken = (await bRes.json()).data.accessToken;
 
+    await fetch(`${baseUrl}/api/payments/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sellerToken}` },
+      body: JSON.stringify({ walletId: `seller-wallet-${sfx}`, token: "USDC-test" }),
+    });
+
+    await fetch(`${baseUrl}/api/payments/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${buyerToken}` },
+      body: JSON.stringify({ walletId: `buyer-wallet-${sfx}`, token: "USDC-test" }),
+    });
+
     // 4. Create an Order for Delivery test
     const cartRes = await fetch(`${baseUrl}/api/cart`, {
       method: "POST",
@@ -57,6 +69,14 @@ describe("Sprint 3 API Tests (알림 + 스케줄러 + 배송상태 변경)", () 
       body: JSON.stringify({ cartItemIds: [cartItemId], shippingAddress: "Busan" }),
     });
     orderId = (await orderRes.json()).data.order.id;
+
+    const payRes = await fetch(`${baseUrl}/api/orders/${orderId}/pay`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${buyerToken}` },
+    });
+    expect(payRes.status).toBe(200);
+    const payPayload = await payRes.json();
+    expect(payPayload.data.order.paymentStatus).toBe("PAID");
   });
 
   afterAll((done) => {

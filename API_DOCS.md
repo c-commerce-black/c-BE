@@ -13,9 +13,10 @@
 3. [상품 (Products)](#상품-products)
 4. [판매자 상품 관리 (Seller Products)](#판매자-상품-관리-seller-products)
 5. [장바구니 (Cart)](#장바구니-cart)
-6. [주문 (Orders)](#주문-orders)
-7. [알림/찜 (Alerts)](#알림찜-alerts)
-8. [공통 상수](#공통-상수)
+6. [결제 (Payments)](#결제-payments)
+7. [주문 (Orders)](#주문-orders)
+8. [알림/찜 (Alerts)](#알림찜-alerts)
+9. [공통 상수](#공통-상수)
 
 ---
 
@@ -683,6 +684,51 @@ Authorization: Bearer {accessToken}
 
 ---
 
+## 결제 (Payments)
+
+> **Base Path**: `/api/payments`  
+> 🔒 **모든 엔드포인트 인증 필요**
+
+결제 연동은 `stablecoin` API를 사용합니다. 실제 운영 연동 시에는
+`docs/integration/request-signing.md` 규칙에 맞춰 백엔드가 `/v1/transfers`
+요청을 서명해서 전송합니다.
+
+### GET /api/payments/profile — 내 결제 지갑 조회
+
+**응답** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "paymentProfile": {
+      "walletId": "wallet_9664a2ec16af44eaa3e0",
+      "token": "USDC-test",
+      "balance": 500000,
+      "updatedAt": 1700000000000
+    }
+  }
+}
+```
+
+### POST /api/payments/profile — 내 결제 지갑 보장
+
+**응답** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "paymentProfile": {
+      "walletId": "wallet_9664a2ec16af44eaa3e0",
+      "token": "USDC-test",
+      "balance": 500000,
+      "updatedAt": 1700000000000
+    }
+  }
+}
+```
+
+---
+
 ## 주문 (Orders)
 
 > **Base Path**: `/api/orders`  
@@ -691,6 +737,7 @@ Authorization: Bearer {accessToken}
 ### POST /api/orders — 주문 생성
 
 장바구니에서 선택한 항목으로 주문을 생성합니다. 주문 생성 시 해당 장바구니 항목은 자동으로 삭제되고 재고가 차감됩니다.
+결제는 이 단계에서 수행되지 않으며, 생성 직후 `paymentStatus` 는 `UNPAID` 입니다.
 
 **Headers**
 ```
@@ -719,6 +766,7 @@ Authorization: Bearer {accessToken}
     "order": {
       "id": "order123",
       "status": "PENDING",
+      "paymentStatus": "UNPAID",
       "totalAmount": 20000,
       "discountAmount": 6000,
       "shippingFee": 2500,
@@ -751,6 +799,48 @@ Authorization: Bearer {accessToken}
 
 ---
 
+### POST /api/orders/:id/pay — 주문 결제
+
+등록된 결제 지갑 정보를 사용해 주문 금액을 판매자별로 분할 정산합니다.
+한 주문에 여러 판매자가 포함된 경우 payment record 가 여러 건 생성될 수 있습니다.
+
+**응답** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "order": {
+      "id": "order123",
+      "status": "PENDING",
+      "paymentStatus": "PAID",
+      "paidAt": 1700000001234
+    },
+    "payments": [
+      {
+        "id": "pay123",
+        "sellerId": "seller-profile-1",
+        "sellerShopName": "홍길동 Shop",
+        "token": "USDC-test",
+        "amount": 14000,
+        "status": "COMPLETED",
+        "referenceId": "ord_1234abcd5678efgh9012ijkl",
+        "transferId": "mock-transfer-123"
+      }
+    ]
+  }
+}
+```
+
+**에러 케이스**
+
+| 상태 코드 | 메시지 |
+|---|---|
+| 400 | 결제용 지갑 정보가 없습니다. 먼저 /api/payments/profile 을 등록하세요. |
+| 400 | {판매자명} 판매자의 정산 지갑 정보가 없습니다. |
+| 400 | 취소된 주문은 결제할 수 없습니다. |
+
+---
+
 ### GET /api/orders — 주문 목록 조회
 
 **Headers**
@@ -767,6 +857,7 @@ Authorization: Bearer {accessToken}
       {
         "id": "order123",
         "status": "PENDING",
+        "paymentStatus": "UNPAID",
         "finalAmount": 16500,
         "createdAt": 1700000000000,
         "items": [
@@ -812,6 +903,7 @@ Authorization: Bearer {accessToken}
     "order": {
       "id": "order123",
       "status": "PENDING",
+      "paymentStatus": "PAID",
       "totalAmount": 20000,
       "discountAmount": 6000,
       "shippingFee": 2500,
@@ -819,6 +911,19 @@ Authorization: Bearer {accessToken}
       "shippingAddress": "서울시 강남구 테헤란로 123",
       "createdAt": 1700000000000,
       "updatedAt": 1700000000000,
+      "paidAt": 1700000001234,
+      "payments": [
+        {
+          "id": "pay123",
+          "sellerId": "seller-profile-1",
+          "sellerShopName": "홍길동 Shop",
+          "token": "USDC-test",
+          "amount": 14000,
+          "status": "COMPLETED",
+          "referenceId": "ord_1234abcd5678efgh9012ijkl",
+          "transferId": "mock-transfer-123"
+        }
+      ],
       "items": [
         {
           "productId": "prod123",
@@ -844,7 +949,7 @@ Authorization: Bearer {accessToken}
 
 ### PATCH /api/orders/:id/cancel — 주문 취소 (구매자)
 
-`PENDING` 상태인 주문만 취소할 수 있습니다. 취소 시 재고가 자동으로 복구됩니다.
+`PENDING` 상태이면서 아직 결제되지 않은 주문만 취소할 수 있습니다. 취소 시 재고가 자동으로 복구됩니다.
 
 **Headers**
 ```
@@ -870,6 +975,7 @@ Authorization: Bearer {accessToken}
 | 상태 코드 | 메시지                      |
 |-------|--------------------------|
 | 400   | PENDING 상태의 주문만 취소할 수 있습니다. |
+| 400   | 결제 완료 또는 부분 결제된 주문은 아직 취소할 수 없습니다. |
 | 404   | 주문을 찾을 수 없습니다.            |
 
 ---
@@ -878,6 +984,7 @@ Authorization: Bearer {accessToken}
 
 > 🔒 **SELLER 또는 ADMIN 역할 필요**  
 > 본인 상품이 포함된 주문만 변경 가능합니다.
+> 결제 완료(`paymentStatus = PAID`) 이후에만 배송 상태를 바꿀 수 있습니다.
 
 **허용된 상태 전이**
 
