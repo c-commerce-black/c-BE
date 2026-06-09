@@ -1039,6 +1039,7 @@ Base Path: `/api/payments`
   "data": {
     "paymentProfile": {
       "walletId": "wallet_abcd1234",
+      "depositAddress": "F3t9...base58",
       "token": "USDC-test",
       "balance": 500000,
       "updatedAt": 1780934400000
@@ -1061,6 +1062,7 @@ Base Path: `/api/payments`
   "data": {
     "paymentProfile": {
       "walletId": "wallet_abcd1234",
+      "depositAddress": "F3t9...base58",
       "token": "USDC-test",
       "balance": 500000,
       "updatedAt": 1780934400000

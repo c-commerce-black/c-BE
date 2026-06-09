@@ -4,7 +4,10 @@ const { DEFAULT_PAYMENT_TOKEN } = require("./config");
 const { authenticate } = require("./auth");
 const { db } = require("./db");
 const { AppError, asyncHandler } = require("./errors");
-const { ensurePaymentProfile, selectPaymentProfileByUserId } = require("./payment-profiles");
+const {
+  ensureStablecoinPaymentProfile,
+  selectPaymentProfileByUserId,
+} = require("./payment-profiles");
 const { createTransfer, StablecoinApiError } = require("./stablecoin");
 const { createId, now } = require("./utils");
 
@@ -78,6 +81,7 @@ const formatPaymentProfile = (profile) =>
   profile
     ? {
         walletId: profile.wallet_id,
+        depositAddress: profile.deposit_address || null,
         token: profile.token,
         balance: profile.balance,
         updatedAt: profile.updated_at,
@@ -156,13 +160,47 @@ const syncOrderPaymentState = (orderId) => {
 const ensurePaymentReference = (orderId, sellerId) =>
   `ord_${crypto.createHash("sha256").update(`${orderId}:${sellerId}`).digest("hex").slice(0, 24)}`;
 
-const groupOrderPayments = (orderId, payerUserId) => {
+const allocateShippingFee = (groups, shippingFee) => {
+  if (!groups.length || shippingFee <= 0) {
+    return groups;
+  }
+
+  const subtotal = groups.reduce((sum, group) => sum + group.amount, 0);
+  if (subtotal <= 0) {
+    groups[0].amount += shippingFee;
+    return groups;
+  }
+
+  let allocated = 0;
+  const groupsWithShares = groups.map((group) => {
+    const share = Math.floor((shippingFee * group.amount) / subtotal);
+    allocated += share;
+    return {
+      group,
+      share,
+      remainder: (shippingFee * group.amount) % subtotal,
+    };
+  });
+
+  groupsWithShares.sort((a, b) => b.remainder - a.remainder || a.group.sellerId.localeCompare(b.group.sellerId));
+
+  let remaining = shippingFee - allocated;
+  for (const entry of groupsWithShares) {
+    const extra = remaining > 0 ? 1 : 0;
+    entry.group.amount += entry.share + extra;
+    remaining -= extra;
+  }
+
+  return groups;
+};
+
+const groupOrderPayments = async (orderId, payerUserId) => {
   const order = selectOrderById.get(orderId);
   if (!order) {
     throw new AppError("주문을 찾을 수 없습니다.", 404);
   }
 
-  const payerProfile = ensurePaymentProfile(payerUserId);
+  const payerProfile = await ensureStablecoinPaymentProfile(payerUserId);
 
   const items = selectOrderItemsWithSeller.all(orderId);
   if (!items.length) {
@@ -186,14 +224,18 @@ const groupOrderPayments = (orderId, payerUserId) => {
     groupedBySeller.set(item.seller_id, existing);
   }
 
-  return Array.from(groupedBySeller.values()).map((group) => {
-    const payeeProfile = ensurePaymentProfile(group.payeeUserId);
+  const groups = allocateShippingFee(Array.from(groupedBySeller.values()), order.shipping_fee || 0);
+
+  const resolvedGroups = [];
+
+  for (const group of groups) {
+    const payeeProfile = await ensureStablecoinPaymentProfile(group.payeeUserId);
 
     if (payeeProfile.token !== payerProfile.token) {
       throw new AppError(`${group.shopName} 판매자의 정산 토큰이 구매자 토큰과 다릅니다.`, 400);
     }
 
-    return {
+    resolvedGroups.push({
       sellerId: group.sellerId,
       payeeUserId: group.payeeUserId,
       shopName: group.shopName,
@@ -202,8 +244,10 @@ const groupOrderPayments = (orderId, payerUserId) => {
       dstWalletId: payeeProfile.wallet_id,
       token: payerProfile.token,
       referenceId: ensurePaymentReference(orderId, group.sellerId),
-    };
-  });
+    });
+  }
+
+  return resolvedGroups;
 };
 
 const preparePaymentRecords = db.transaction(({ orderId, payerUserId, groups }) => {
@@ -285,7 +329,7 @@ const executeOrderPayment = async ({ orderId, payerUserId }) => {
     };
   }
 
-  const paymentGroups = groupOrderPayments(orderId, payerUserId);
+  const paymentGroups = await groupOrderPayments(orderId, payerUserId);
   const paymentRows = preparePaymentRecords({ orderId, payerUserId, groups: paymentGroups });
 
   for (const payment of paymentRows) {
@@ -373,7 +417,7 @@ router.use(authenticate);
 router.get(
   "/profile",
   asyncHandler(async (req, res) => {
-    const paymentProfile = ensurePaymentProfile(req.user.id);
+    const paymentProfile = await ensureStablecoinPaymentProfile(req.user.id);
 
     res.json({
       success: true,
@@ -398,7 +442,7 @@ router.get(
 router.post(
   "/profile",
   asyncHandler(async (req, res) => {
-    const paymentProfile = ensurePaymentProfile(req.user.id);
+    const paymentProfile = await ensureStablecoinPaymentProfile(req.user.id);
 
     res.json({
       success: true,

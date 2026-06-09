@@ -1,4 +1,4 @@
-const { buildCanonicalMessage, sha256Hex } = require("./stablecoin");
+const { buildCanonicalMessage, createWallet, sha256Hex } = require("./stablecoin");
 
 describe("Stablecoin signing helpers", () => {
   test("buildCanonicalMessage follows request-signing guide", () => {
@@ -20,5 +20,13 @@ describe("Stablecoin signing helpers", () => {
         sha256Hex(bodyBuffer),
       ].join("\n"),
     );
+  });
+
+  test("mock wallet creation returns a local wallet id shape", async () => {
+    await expect(createWallet({ label: "user-1" })).resolves.toMatchObject({
+      wallet_id: expect.stringMatching(/^wallet_/),
+      label: "user-1",
+      wallet_type: "USER",
+    });
   });
 });

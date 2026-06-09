@@ -1,4 +1,5 @@
 const app = require("./app");
+const { db } = require("./db");
 
 describe("Payment API Tests", () => {
   let server;
@@ -79,6 +80,7 @@ describe("Payment API Tests", () => {
     const payload = await res.json();
     expect(res.status).toBe(200);
     expect(payload.data.paymentProfile.walletId).toContain("wallet_");
+    expect(payload.data.paymentProfile).toHaveProperty("depositAddress");
   });
 
   test("2. 주문 결제", async () => {
@@ -90,6 +92,9 @@ describe("Payment API Tests", () => {
     expect(res.status).toBe(200);
     expect(payload.data.order.paymentStatus).toBe("PAID");
     expect(payload.data.payments[0].status).toBe("COMPLETED");
+    expect(payload.data.payments[0].amount).toBe(payload.data.order.finalAmount);
+    const paymentRow = db.prepare("SELECT raw_response FROM payments WHERE id = ?").get(payload.data.payments[0].id);
+    expect(JSON.parse(paymentRow.raw_response).amount).toBe(String(payload.data.order.finalAmount));
   });
 
   test("3. 결제된 주문은 취소 불가", async () => {

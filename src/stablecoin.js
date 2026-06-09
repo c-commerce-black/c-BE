@@ -98,6 +98,28 @@ const createMockTransfer = async (requestBody) => ({
   dst_wallet_id: requestBody.dst_wallet_id,
 });
 
+const createMockWallet = async ({ label }) => ({
+  wallet_id: `wallet_${crypto.createHash("sha256").update(label).digest("hex").slice(0, 20)}`,
+  label,
+  chain: "mock",
+  wallet_type: "USER",
+  deposit_address: null,
+  status: "ACTIVE",
+  created_at: new Date().toISOString(),
+});
+
+const createWallet = async ({ label }) => {
+  if (STABLECOIN_DRIVER === "mock") {
+    return createMockWallet({ label });
+  }
+
+  return fetchJson({
+    method: "POST",
+    pathAndQuery: "/v1/wallets",
+    bodyObject: { label },
+  });
+};
+
 const createTransfer = async (requestBody) => {
   if (STABLECOIN_DRIVER === "mock") {
     return createMockTransfer(requestBody);
@@ -114,5 +136,6 @@ module.exports = {
   StablecoinApiError,
   buildCanonicalMessage,
   createTransfer,
+  createWallet,
   sha256Hex,
 };

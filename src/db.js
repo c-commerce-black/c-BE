@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS payment_profiles (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL UNIQUE,
   wallet_id TEXT NOT NULL,
+  deposit_address TEXT,
   token TEXT NOT NULL,
   balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
   created_at INTEGER NOT NULL,
@@ -200,6 +201,10 @@ if (!hasColumn("orders", "paid_at")) {
 
 if (!hasColumn("payment_profiles", "balance")) {
   db.exec(`ALTER TABLE payment_profiles ADD COLUMN balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0)`);
+}
+
+if (!hasColumn("payment_profiles", "deposit_address")) {
+  db.exec(`ALTER TABLE payment_profiles ADD COLUMN deposit_address TEXT`);
 }
 
 const getUserWithSeller = db.prepare(`
