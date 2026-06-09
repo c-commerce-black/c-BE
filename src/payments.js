@@ -172,6 +172,10 @@ const groupOrderPayments = (orderId, payerUserId) => {
   const groupedBySeller = new Map();
 
   for (const item of items) {
+    if (item.seller_user_id === payerUserId) {
+      throw new AppError("본인이 등록한 상품은 결제할 수 없습니다.", 400);
+    }
+
     const existing = groupedBySeller.get(item.seller_id) || {
       sellerId: item.seller_id,
       payeeUserId: item.seller_user_id,
@@ -235,6 +239,10 @@ const preparePaymentRecords = db.transaction(({ orderId, payerUserId, groups }) 
 });
 
 const applyWalletBalanceTransfer = db.transaction(({ srcWalletId, dstWalletId, amount }) => {
+  if (srcWalletId === dstWalletId) {
+    throw new AppError("동일한 지갑으로는 결제할 수 없습니다.", 400);
+  }
+
   const profiles = selectPaymentProfilesByWalletIds.all(srcWalletId, dstWalletId);
   const srcProfile = profiles.find((profile) => profile.wallet_id === srcWalletId);
   const dstProfile = profiles.find((profile) => profile.wallet_id === dstWalletId);
@@ -286,6 +294,7 @@ const executeOrderPayment = async ({ orderId, payerUserId }) => {
     }
 
     const currentTime = now();
+    let debitApplied = false;
 
     try {
       applyWalletBalanceTransfer({
@@ -293,6 +302,7 @@ const executeOrderPayment = async ({ orderId, payerUserId }) => {
         dstWalletId: payment.dst_wallet_id,
         amount: payment.amount,
       });
+      debitApplied = true;
 
       const response = await createTransfer({
         src_wallet_id: payment.src_wallet_id,
@@ -313,15 +323,17 @@ const executeOrderPayment = async ({ orderId, payerUserId }) => {
         payment.id,
       );
     } catch (error) {
-      try {
-        applyWalletBalanceTransfer({
-          srcWalletId: payment.dst_wallet_id,
-          dstWalletId: payment.src_wallet_id,
-          amount: payment.amount,
-        });
-      } catch (rollbackError) {
-        // Keep the original payment failure response, but preserve the rollback issue for debugging.
-        console.error("payment balance rollback failed", rollbackError);
+      if (debitApplied) {
+        try {
+          applyWalletBalanceTransfer({
+            srcWalletId: payment.dst_wallet_id,
+            dstWalletId: payment.src_wallet_id,
+            amount: payment.amount,
+          });
+        } catch (rollbackError) {
+          // Keep the original payment failure response, but preserve the rollback issue for debugging.
+          console.error("payment balance rollback failed", rollbackError);
+        }
       }
 
       const message =

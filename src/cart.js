@@ -22,7 +22,7 @@ const selectCartItemById = db.prepare(
 );
 
 const selectProductById = db.prepare(`
-  SELECT p.*, sp.shop_name
+  SELECT p.*, sp.shop_name, sp.user_id AS seller_user_id
   FROM products p
   JOIN seller_profiles sp ON sp.id = p.seller_id
   WHERE p.id = ?
@@ -123,6 +123,10 @@ router.post(
       throw new AppError("상품을 찾을 수 없습니다.", 404);
     }
 
+    if (row.seller_user_id === req.user.id) {
+      throw new AppError("본인이 등록한 상품은 구매할 수 없습니다.", 400);
+    }
+
     const state = buildProductState(row);
     if (["SOLD_OUT", "DELETED", "EXPIRED"].includes(state.status)) {
       throw new AppError("장바구니에 담을 수 없는 상품입니다.", 400);
@@ -211,6 +215,10 @@ router.patch(
 
     if (!product || product.stock < quantity) {
       throw new AppError("재고가 부족합니다.", 400);
+    }
+
+    if (product.seller_user_id === req.user.id) {
+      throw new AppError("본인이 등록한 상품은 구매할 수 없습니다.", 400);
     }
 
     const state = buildProductState(product);

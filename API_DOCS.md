@@ -1,196 +1,314 @@
-# C-Commerce API 문서
+# C-Commerce API 명세서
 
-> **Base URL**: `http://localhost:3000`  
-> **Content-Type**: `application/json`  
-> **인증 방식**: Bearer Token (JWT)d
+> Base URL: `http://localhost:3000`
+> 기본 Content-Type: `application/json`
+> 인증 방식: `Authorization: Bearer {accessToken}`
+> Swagger UI: `GET /api-docs`
 
----
-
-## 📋 목차
-
-1. [공통 응답 형식](#공통-응답-형식)
-2. [인증 (Auth)](#인증-auth)
-3. [상품 (Products)](#상품-products)
-4. [판매자 상품 관리 (Seller Products)](#판매자-상품-관리-seller-products)
-5. [장바구니 (Cart)](#장바구니-cart)
-6. [결제 (Payments)](#결제-payments)
-7. [주문 (Orders)](#주문-orders)
-8. [알림/찜 (Alerts)](#알림찜-alerts)
-9. [공통 상수](#공통-상수)
+이 문서는 현재 백엔드 코드 기준으로 작성되었습니다.
 
 ---
 
-## 공통 응답 형식
+## 1. 공통
 
-### 성공 응답
+### 공통 성공 응답
+
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": {}
 }
 ```
 
-### 에러 응답
+### 공통 에러 응답
+
 ```json
 {
   "success": false,
-  "error": {
-    "message": "에러 메시지",
-    "statusCode": 400
-  }
+  "message": "에러 메시지"
 }
 ```
 
-### 헬스 체크
+### 인증 헤더
+
+인증 필요 API는 아래 헤더가 필요합니다.
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 ```
-GET /health
-```
-**응답**
+
+### 상태 확인
+
+`GET /health`
+
+응답 `200`
+
 ```json
 {
   "success": true,
-  "data": { "status": "ok" }
+  "data": {
+    "status": "ok"
+  }
 }
 ```
 
 ---
 
-## 인증 (Auth)
+## 2. 주요 객체
 
-> **Base Path**: `/api/auth`
-
-### POST /api/auth/register — 회원가입
-
-**Request Body**
-
-| 필드       | 타입     | 필수 | 설명                                 |
-|----------|--------|----|------------------------------------|
-| email    | string | ✅  | 이메일 주소                            |
-| nickname | string | ✅  | 닉네임 (2~20자)                        |
-| password | string | ✅  | 비밀번호 (최소 8자)                      |
-| shopName | string | ❌  | 상점명 (미입력 시 `{닉네임} Shop`으로 자동 생성)  |
-
-> ℹ️ 별도의 역할 구분이 없습니다. 모든 사용자는 상품 판매와 구매를 자유롭게 할 수 있습니다.
+### User
 
 ```json
 {
+  "id": "usr_...",
   "email": "user@example.com",
   "nickname": "홍길동",
-  "password": "password123"
+  "sellerProfileId": "sp_...",
+  "shopName": "홍길동 Shop"
 }
 ```
 
-**응답** `201 Created`
+### Product
+
+```json
+{
+  "id": "prod_...",
+  "name": "유기농 사과",
+  "description": "상품 설명",
+  "category": "FOOD",
+  "originalPrice": 10000,
+  "currentPrice": 8000,
+  "discountRate": 20,
+  "stock": 10,
+  "expiryDate": "2026-06-20",
+  "dDay": 11,
+  "imageUrl": "/uploads/example.jpg",
+  "status": "ON_SALE",
+  "sellerShopName": "판매자 Shop"
+}
+```
+
+### Order
+
+```json
+{
+  "id": "ord_...",
+  "status": "PENDING",
+  "paymentStatus": "UNPAID",
+  "totalAmount": 10000,
+  "discountAmount": 2000,
+  "shippingFee": 2500,
+  "finalAmount": 10500,
+  "shippingAddress": "서울시 ...",
+  "createdAt": 1780934400000,
+  "updatedAt": 1780934400000,
+  "paidAt": null,
+  "items": [],
+  "payments": []
+}
+```
+
+### PaymentProfile
+
+```json
+{
+  "walletId": "wallet_userid",
+  "token": "USDC-test",
+  "balance": 500000,
+  "updatedAt": 1780934400000
+}
+```
+
+### Payment
+
+```json
+{
+  "id": "pay_...",
+  "orderId": "ord_...",
+  "sellerId": "sp_...",
+  "sellerShopName": "판매자 Shop",
+  "payeeNickname": "판매자",
+  "payerNickname": "구매자",
+  "token": "USDC-test",
+  "amount": 8000,
+  "status": "COMPLETED",
+  "referenceId": "ord_xxxxxxxxx",
+  "transferId": "tr_...",
+  "errorMessage": null,
+  "direction": "OUT",
+  "counterparty": "판매자 Shop",
+  "paidAt": 1780934400000,
+  "updatedAt": 1780934400000
+}
+```
+
+---
+
+## 3. 상수
+
+### 상품 카테고리
+
+`FOOD`, `BEAUTY`, `DRINK`, `MEAL_KIT`, `OTHER`
+
+### 상품 상태
+
+`ON_SALE`, `EXPIRY_SOON`, `SOLD_OUT`, `EXPIRED`, `DELETED`
+
+목록 조회에서는 `DELETED`, `EXPIRED` 상품이 제외됩니다.
+
+### 주문 상태
+
+`PENDING`, `PREPARING`, `SHIPPING`, `DELIVERED`, `CANCELLED`
+
+### 주문 결제 상태
+
+`UNPAID`, `FAILED`, `PARTIAL`, `PAID`
+
+### 결제 레코드 상태
+
+`PENDING`, `FAILED`, `COMPLETED`
+
+### 할인 규칙
+
+서버는 유통기한 D-Day 기준으로 현재 가격을 계산합니다.
+
+| 조건 | 현재 가격 |
+| --- | --- |
+| `dDay <= 0` | 원가의 30% |
+| `dDay <= 2` | 원가의 50% |
+| `dDay <= 4` | 원가의 80% |
+| 그 외 | 원가의 95% |
+
+배송비는 장바구니/주문 항목이 있으면 `2500`원입니다.
+
+---
+
+## 4. 인증 API
+
+Base Path: `/api/auth`
+
+### 회원가입
+
+`POST /api/auth/register`
+
+인증 불필요
+
+요청 Body
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| email | string | Y | 이메일 |
+| nickname | string | Y | 닉네임, 2~20자 |
+| password | string | Y | 비밀번호, 8자 이상 |
+| shopName | string | N | 상점명. 없으면 `{nickname} Shop` |
+| agreements.terms | boolean | N | 전달한 경우 필수 true |
+| agreements.privacy | boolean | N | 전달한 경우 필수 true |
+| agreements.marketing | boolean | N | 마케팅 동의 |
+
+```json
+{
+  "email": "buyer@example.com",
+  "nickname": "구매자",
+  "password": "password123",
+  "shopName": "구매자 Shop",
+  "agreements": {
+    "terms": true,
+    "privacy": true,
+    "marketing": false
+  }
+}
+```
+
+응답 `201`
+
 ```json
 {
   "success": true,
   "data": {
     "user": {
-      "id": "abc123",
-      "email": "user@example.com",
-      "nickname": "홍길동",
-      "sellerProfileId": "sp123",
-      "shopName": "홍길동 Shop"
+      "id": "usr_...",
+      "email": "buyer@example.com",
+      "nickname": "구매자",
+      "sellerProfileId": "sp_...",
+      "shopName": "구매자 Shop"
     },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "accessToken": "jwt...",
     "expiresIn": 604800
   }
 }
 ```
 
-**에러 케이스**
+주요 에러: `400 email, nickname, and password are required`, `400 password must be at least 8 characters`, `409 Email already exists`
 
-| 상태 코드 | 메시지                                         |
-|-------|---------------------------------------------|
-| 400   | email, nickname, and password are required  |
-| 400   | nickname must be between 2 and 20 characters |
-| 400   | password must be at least 8 characters      |
-| 409   | Email already exists                        |
+### 로그인
 
----
+`POST /api/auth/login`
 
-### POST /api/auth/login — 로그인
-
-**Request Body**
-
-| 필드       | 타입     | 필수 | 설명    |
-|----------|--------|-----|-------|
-| email    | string | ✅  | 이메일  |
-| password | string | ✅  | 비밀번호 |
+인증 불필요
 
 ```json
 {
-  "email": "user@example.com",
+  "email": "buyer@example.com",
   "password": "password123"
 }
 ```
 
-**응답** `200 OK`
+응답 `200`
+
 ```json
 {
   "success": true,
   "data": {
     "user": {
-      "id": "abc123",
-      "email": "user@example.com",
-      "nickname": "홍길동",
-      "sellerProfileId": "sp123",
-      "shopName": "홍길동 Shop"
+      "id": "usr_...",
+      "email": "buyer@example.com",
+      "nickname": "구매자",
+      "sellerProfileId": "sp_...",
+      "shopName": "구매자 Shop"
     },
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "accessToken": "jwt...",
     "expiresIn": 604800
   }
 }
 ```
 
-**에러 케이스**
+주요 에러: `400 email and password are required`, `401 Invalid email or password`
 
-| 상태 코드 | 메시지                         |
-|-------|-------------------------------|
-| 400   | email and password are required |
-| 401   | Invalid email or password     |
+### 로그아웃
 
----
+`POST /api/auth/logout`
 
-### POST /api/auth/logout — 로그아웃
+인증 필요
 
-> 🔒 **인증 필요**
+응답 `200`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
-  "data": { "message": "로그아웃 되었습니다." }
+  "data": {
+    "message": "로그아웃 되었습니다."
+  }
 }
 ```
 
----
+### 내 정보 조회
 
-### GET /api/auth/me — 내 정보 조회
+`GET /api/auth/me`
 
-> 🔒 **인증 필요**
+인증 필요
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
+응답 `200`
 
-**응답** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "user": {
-      "id": "abc123",
-      "email": "user@example.com",
-      "nickname": "홍길동",
-      "sellerProfileId": "sp123",
-      "shopName": "홍길동 Shop"
+      "id": "usr_...",
+      "email": "buyer@example.com",
+      "nickname": "구매자",
+      "sellerProfileId": "sp_...",
+      "shopName": "구매자 Shop"
     }
   }
 }
@@ -198,589 +316,94 @@ Authorization: Bearer {accessToken}
 
 ---
 
-## 상품 (Products)
+## 5. 상품 API
 
-> **Base Path**: `/api/products`  
-> 인증 불필요 (공개 API)
+Base Path: `/api/products`
 
-### GET /api/products — 상품 목록 조회
+### 상품 목록 조회
 
-**Query Parameters**
+`GET /api/products`
 
-| 파라미터   | 타입     | 설명                                                       |
-|--------|--------|----------------------------------------------------------|
-| page   | number | 페이지 번호 (기본값: 1)                                          |
-| limit  | number | 페이지당 항목 수 (기본값: 20)                                      |
-| category | string | 카테고리 필터 (`FOOD`, `BEAUTY`, `DRINK`, `MEAL_KIT`, `OTHER`) |
-| status | string | 상태 필터 (`ON_SALE`, `EXPIRY_SOON`, `SOLD_OUT`)             |
-| sort   | string | 정렬 기준 (아래 참조)                                            |
+인증 불필요
 
-**sort 옵션**
+Query
 
-| 값             | 설명          |
-|---------------|-------------|
-| `expiry_asc`  | 유통기한 임박순 (기본값) |
-| `discount_desc` | 할인율 높은순   |
-| `price_asc`   | 가격 낮은순      |
-| `price_desc`  | 가격 높은순      |
+| 이름 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| page | number | N | 기본값 `1` |
+| limit | number | N | 기본값 `20` |
+| category | string | N | 상품 카테고리 |
+| status | string | N | 상품 상태 |
+| q | string | N | 상품명 또는 판매자 상점명 검색 |
+| sort | string | N | `expiry_asc`, `discount_desc`, `price_asc`, `price_desc` |
 
-> ⚠️ `DELETED`, `EXPIRED` 상태 상품은 목록에 포함되지 않습니다.
+응답 `200`
 
-**응답** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "products": [
       {
-        "id": "prod123",
+        "id": "prod_...",
         "name": "유기농 사과",
+        "description": "상품 설명",
         "category": "FOOD",
         "originalPrice": 10000,
-        "currentPrice": 7000,
-        "discountRate": 30,
-        "stock": 50,
-        "expiryDate": "2025-12-31",
+        "currentPrice": 8000,
+        "discountRate": 20,
+        "stock": 5,
+        "expiryDate": "2026-06-20",
+        "dDay": 11,
+        "imageUrl": "/uploads/apple.jpg",
         "status": "ON_SALE",
-        "dDay": 5,
-        "imageUrl": "https://example.com/image.jpg"
+        "sellerShopName": "판매자 Shop"
       }
     ],
     "pagination": {
       "page": 1,
       "limit": 20,
-      "total": 100,
-      "totalPages": 5
-    }
-  }
-}
-```
-
----
-
-### GET /api/products/:id — 상품 상세 조회
-
-**Path Parameters**
-
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 상품 ID |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "product": {
-      "id": "prod123",
-      "name": "유기농 사과",
-      "category": "FOOD",
-      "description": "국내산 유기농 사과입니다.",
-      "originalPrice": 10000,
-      "currentPrice": 7000,
-      "discountRate": 30,
-      "stock": 50,
-      "expiryDate": "2025-12-31",
-      "status": "ON_SALE",
-      "dDay": 5,
-      "imageUrl": "https://example.com/image.jpg",
-      "seller": {
-        "id": "seller123",
-        "shopName": "홍길동 Shop"
-      },
-      "priceHistory": [
-        { "dDay": 5, "price": 7000 },
-        { "dDay": 3, "price": 6000 }
-      ]
-    }
-  }
-}
-```
-
-**에러 케이스**
-
-| 상태 코드 | 메시지              |
-|-------|------------------|
-| 404   | 상품을 찾을 수 없습니다.   |
-
----
-
-## 판매자 상품 관리 (Seller Products)
-
-> **Base Path**: `/api/seller/products`  
-> 🔒 **인증 필요** (모든 사용자가 판매 가능 - 당근마켓 방식)
-
----
-
-### GET /api/seller/products — 내 상품 목록 (판매자 대시보드)
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Query Parameters**
-
-| 파라미터  | 타입     | 설명              |
-|-------|--------|-----------------|
-| page  | number | 페이지 번호 (기본값: 1) |
-| limit | number | 페이지당 항목 수       |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "todaySales": 150000,
-    "stats": {
-      "onSale": 10,
-      "expirySoon": 3,
-      "todayOrders": 5
-    },
-    "products": [
-      {
-        "id": "prod123",
-        "name": "유기농 사과",
-        "currentPrice": 7000,
-        "stock": 50,
-        "expiryDate": "2025-12-31",
-        "status": "ON_SALE",
-        "todaySoldCount": 12
-      }
-    ],
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 10,
+      "total": 1,
       "totalPages": 1
     }
   }
 }
 ```
 
----
+### 상품 상세 조회
 
-### POST /api/seller/products — 상품 등록
+`GET /api/products/{id}`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
+인증 불필요
 
-**Request Body**
+응답 `200`
 
-| 필드            | 타입     | 필수 | 설명                              |
-|-------------|--------|----|---------------------------------|
-| name        | string | ✅  | 상품명                             |
-| category    | string | ✅  | 카테고리 (공통 상수 참조)                 |
-| originalPrice | number | ✅  | 원가 (0 이상 정수)                   |
-| stock       | number | ✅  | 재고 수량 (0 이상 정수)                 |
-| expiryDate  | string | ✅  | 유통기한 (예: `"2025-12-31"`)        |
-| description | string | ❌  | 상품 설명                           |
-| imageUrl    | string | ❌  | 이미지 URL                         |
-
-```json
-{
-  "name": "유기농 사과",
-  "category": "FOOD",
-  "originalPrice": 10000,
-  "stock": 100,
-  "expiryDate": "2025-12-31",
-  "description": "국내산 유기농 사과",
-  "imageUrl": "https://example.com/apple.jpg"
-}
-```
-
-**응답** `201 Created`
 ```json
 {
   "success": true,
   "data": {
     "product": {
-      "id": "prod123",
+      "id": "prod_...",
       "name": "유기농 사과",
+      "description": "상품 설명",
       "category": "FOOD",
       "originalPrice": 10000,
-      "currentPrice": 10000,
-      "stock": 100,
-      "expiryDate": "2025-12-31",
-      "status": "ON_SALE"
-    }
-  }
-}
-```
-
-**에러 케이스**
-
-| 상태 코드 | 메시지                                              |
-|-------|--------------------------------------------------|
-| 400   | name, category, originalPrice, stock, expiryDate are required |
-| 400   | Invalid category                                 |
-| 403   | 판매자 등록이 필요합니다.                                   |
-
----
-
-### PATCH /api/seller/products/:id — 상품 수정
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 상품 ID |
-
-**Request Body** (모두 선택 사항)
-
-| 필드            | 타입     | 설명          |
-|-------------|--------|-------------|
-| name        | string | 상품명         |
-| description | string | 상품 설명       |
-| category    | string | 카테고리        |
-| originalPrice | number | 원가          |
-| stock       | number | 재고          |
-| expiryDate  | string | 유통기한        |
-| imageUrl    | string | 이미지 URL     |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "product": {
-      "id": "prod123",
-      "name": "유기농 사과 (수정됨)",
       "currentPrice": 8000,
-      "stock": 80,
-      "expiryDate": "2025-12-31",
+      "discountRate": 20,
+      "stock": 5,
+      "expiryDate": "2026-06-20",
+      "dDay": 11,
+      "imageUrl": "/uploads/apple.jpg",
       "status": "ON_SALE",
-      "updatedAt": 1700000000000
-    }
-  }
-}
-```
-
-**에러 케이스**
-
-| 상태 코드 | 메시지            |
-|-------|----------------|
-| 404   | 상품을 찾을 수 없습니다. |
-| 403   | 판매자 등록이 필요합니다. |
-
----
-
-### DELETE /api/seller/products/:id — 상품 삭제
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 상품 ID |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": { "message": "상품이 삭제되었습니다." }
-}
-```
-
-> ℹ️ 실제 DB 삭제가 아닌 소프트 삭제(`DELETED` 상태 전환)
-
-**에러 케이스**
-
-| 상태 코드 | 메시지            |
-|-------|----------------|
-| 404   | 상품을 찾을 수 없습니다. |
-
----
-
-## 장바구니 (Cart)
-
-> **Base Path**: `/api/cart`  
-> 🔒 **모든 엔드포인트 인증 필요**
-
-### GET /api/cart — 장바구니 조회
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "cartItemId": "cart123",
-        "quantity": 2,
-        "product": {
-          "id": "prod123",
-          "name": "유기농 사과",
-          "currentPrice": 7000,
-          "originalPrice": 10000,
-          "status": "ON_SALE",
-          "imageUrl": "https://example.com/apple.jpg"
-        }
-      }
-    ],
-    "summary": {
-      "totalAmount": 20000,
-      "discountAmount": 6000,
-      "shippingFee": 2500,
-      "finalAmount": 16500
-    },
-    "priceChanged": false
-  }
-}
-```
-
-> ℹ️ `priceChanged: true`이면 장바구니에 담은 후 상품 가격이 변경된 것을 의미합니다.
-
----
-
-### POST /api/cart — 장바구니 담기
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Request Body**
-
-| 필드        | 타입     | 필수 | 설명          |
-|---------|--------|-----|-------------|
-| productId | string | ✅  | 상품 ID       |
-| quantity | number | ✅  | 수량 (1 이상)   |
-
-```json
-{
-  "productId": "prod123",
-  "quantity": 2
-}
-```
-
-**응답** `201 Created`
-```json
-{
-  "success": true,
-  "data": {
-    "cartItem": {
-      "id": "cart123",
-      "productId": "prod123",
-      "quantity": 2
-    }
-  }
-}
-```
-
-> ℹ️ 동일 상품이 이미 장바구니에 있으면 수량이 합산됩니다.
-
-**에러 케이스**
-
-| 상태 코드 | 메시지               |
-|-------|-------------------|
-| 400   | 재고가 부족합니다.        |
-| 400   | 장바구니에 담을 수 없는 상품입니다. |
-| 404   | 상품을 찾을 수 없습니다.    |
-
----
-
-### PATCH /api/cart/:cartItemId — 장바구니 수량 변경
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터       | 타입     | 설명         |
-|----------|--------|------------|
-| cartItemId | string | 장바구니 항목 ID |
-
-**Request Body**
-
-| 필드       | 타입     | 필수 | 설명         |
-|--------|--------|-----|------------|
-| quantity | number | ✅  | 새 수량 (1 이상) |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "cartItem": {
-      "id": "cart123",
-      "quantity": 3,
-      "updatedAt": 1700000000000
-    }
-  }
-}
-```
-
-**에러 케이스**
-
-| 상태 코드 | 메시지                |
-|-------|--------------------| 
-| 400   | 재고가 부족합니다.         |
-| 404   | 장바구니 항목을 찾을 수 없습니다. |
-
----
-
-### DELETE /api/cart/:cartItemId — 장바구니 항목 삭제
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터       | 타입     | 설명         |
-|----------|--------|------------|
-| cartItemId | string | 장바구니 항목 ID |
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": { "message": "장바구니에서 삭제되었습니다." }
-}
-```
-
-**에러 케이스**
-
-| 상태 코드 | 메시지                |
-|-------|--------------------| 
-| 404   | 장바구니 항목을 찾을 수 없습니다. |
-
----
-
-### DELETE /api/cart — 장바구니 전체 비우기
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": { "message": "장바구니가 비워졌습니다." }
-}
-```
-
----
-
-## 결제 (Payments)
-
-> **Base Path**: `/api/payments`  
-> 🔒 **모든 엔드포인트 인증 필요**
-
-결제 연동은 `stablecoin` API를 사용합니다. 실제 운영 연동 시에는
-`docs/integration/request-signing.md` 규칙에 맞춰 백엔드가 `/v1/transfers`
-요청을 서명해서 전송합니다.
-
-### GET /api/payments/profile — 내 결제 지갑 조회
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "paymentProfile": {
-      "walletId": "wallet_9664a2ec16af44eaa3e0",
-      "token": "USDC-test",
-      "balance": 500000,
-      "updatedAt": 1700000000000
-    }
-  }
-}
-```
-
-### POST /api/payments/profile — 내 결제 지갑 보장
-
-**응답** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "paymentProfile": {
-      "walletId": "wallet_9664a2ec16af44eaa3e0",
-      "token": "USDC-test",
-      "balance": 500000,
-      "updatedAt": 1700000000000
-    }
-  }
-}
-```
-
----
-
-## 주문 (Orders)
-
-> **Base Path**: `/api/orders`  
-> 🔒 **모든 엔드포인트 인증 필요**
-
-### POST /api/orders — 주문 생성
-
-장바구니에서 선택한 항목으로 주문을 생성합니다. 주문 생성 시 해당 장바구니 항목은 자동으로 삭제되고 재고가 차감됩니다.
-결제는 이 단계에서 수행되지 않으며, 생성 직후 `paymentStatus` 는 `UNPAID` 입니다.
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Request Body**
-
-| 필드              | 타입       | 필수 | 설명                     |
-|-------------|----------|-----|------------------------|
-| cartItemIds | string[] | ✅  | 주문할 장바구니 항목 ID 배열       |
-| shippingAddress | string | ✅  | 배송지 주소                 |
-
-```json
-{
-  "cartItemIds": ["cart123", "cart456"],
-  "shippingAddress": "서울시 강남구 테헤란로 123"
-}
-```
-
-**응답** `201 Created`
-```json
-{
-  "success": true,
-  "data": {
-    "order": {
-      "id": "order123",
-      "status": "PENDING",
-      "paymentStatus": "UNPAID",
-      "totalAmount": 20000,
-      "discountAmount": 6000,
-      "shippingFee": 2500,
-      "finalAmount": 16500,
-      "shippingAddress": "서울시 강남구 테헤란로 123",
-      "createdAt": 1700000000000,
-      "items": [
+      "sellerShopName": "판매자 Shop",
+      "seller": {
+        "id": "sp_...",
+        "shopName": "판매자 Shop"
+      },
+      "priceHistory": [
         {
-          "productId": "prod123",
-          "name": "유기농 사과",
-          "imageUrl": "https://example.com/apple.jpg",
-          "quantity": 2,
-          "price": 7000,
-          "dDay": 5
+          "dDay": 4,
+          "price": 8000
         }
       ]
     }
@@ -788,84 +411,406 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-**에러 케이스**
-
-| 상태 코드 | 메시지                        |
-|-------|----------------------------|
-| 400   | cartItemIds and shippingAddress are required |
-| 400   | 선택한 장바구니 항목을 모두 찾을 수 없습니다. |
-| 400   | {상품명} 상품은 주문할 수 없습니다.      |
-| 400   | {상품명} 재고가 부족합니다.           |
+주요 에러: `404 상품을 찾을 수 없습니다.`
 
 ---
 
-### POST /api/orders/:id/pay — 주문 결제
+## 6. 판매자 상품 관리 API
 
-등록된 결제 지갑 정보를 사용해 주문 금액을 판매자별로 분할 정산합니다.
-한 주문에 여러 판매자가 포함된 경우 payment record 가 여러 건 생성될 수 있습니다.
+Base Path: `/api/seller/products`
 
-**응답** `200 OK`
+모든 API 인증 필요입니다. 별도 판매자 가입 절차는 없으며, 사용자별 `sellerProfile`이 자동 생성됩니다.
+
+### 내 판매 상품 목록/대시보드 조회
+
+`GET /api/seller/products`
+
+Query
+
+| 이름 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| page | number | N | 기본값 `1` |
+| limit | number | N | 기본값 `20` |
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "todaySales": 16000,
+    "stats": {
+      "onSale": 3,
+      "expirySoon": 1,
+      "todayOrders": 2
+    },
+    "products": [
+      {
+        "id": "prod_...",
+        "name": "유기농 사과",
+        "currentPrice": 8000,
+        "stock": 5,
+        "expiryDate": "2026-06-20",
+        "status": "ON_SALE",
+        "todaySoldCount": 2
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
+}
+```
+
+### 상품 등록
+
+`POST /api/seller/products`
+
+요청 Body
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| name | string | Y | 상품명 |
+| description | string | N | 설명 |
+| category | string | Y | 상품 카테고리 |
+| originalPrice | number | Y | 원가, 0 이상 |
+| stock | number | Y | 재고, 0 이상 |
+| expiryDate | string | Y | 유통기한. `YYYY-MM-DD` 권장 |
+| imageUrl | string | N | 이미지 URL |
+
+```json
+{
+  "name": "유기농 사과",
+  "description": "오늘 입고된 상품",
+  "category": "FOOD",
+  "originalPrice": 10000,
+  "stock": 10,
+  "expiryDate": "2026-06-20",
+  "imageUrl": "/uploads/apple.jpg"
+}
+```
+
+응답 `201`
+
+```json
+{
+  "success": true,
+  "data": {
+    "product": {
+      "id": "prod_...",
+      "name": "유기농 사과",
+      "category": "FOOD",
+      "originalPrice": 10000,
+      "currentPrice": 9500,
+      "stock": 10,
+      "expiryDate": "2026-06-20",
+      "status": "ON_SALE"
+    }
+  }
+}
+```
+
+주요 에러: `400 name, category, originalPrice, stock, expiryDate are required`, `400 Invalid category`
+
+### 상품 수정
+
+`PATCH /api/seller/products/{id}`
+
+요청 Body는 등록 필드 중 수정할 필드만 전달합니다.
+
+```json
+{
+  "name": "유기농 사과 1kg",
+  "stock": 8,
+  "originalPrice": 12000
+}
+```
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "product": {
+      "id": "prod_...",
+      "name": "유기농 사과 1kg",
+      "currentPrice": 11400,
+      "stock": 8,
+      "expiryDate": "2026-06-20",
+      "status": "ON_SALE",
+      "updatedAt": 1780934400000
+    }
+  }
+}
+```
+
+주요 에러: `404 상품을 찾을 수 없습니다.`, `400 Invalid category`
+
+### 상품 삭제
+
+`DELETE /api/seller/products/{id}`
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "상품이 삭제되었습니다."
+  }
+}
+```
+
+---
+
+## 7. 이미지 업로드 API
+
+Base Path: `/api/uploads`
+
+### 이미지 업로드
+
+`POST /api/uploads/images`
+
+인증 불필요
+
+Content-Type: `multipart/form-data`
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| image | file | Y | 이미지 파일. 최대 10MB |
+
+응답 `201`
+
+```json
+{
+  "success": true,
+  "data": {
+    "imageUrl": "/uploads/1780934400000-a1b2c3.jpg",
+    "key": "1780934400000-a1b2c3.jpg"
+  }
+}
+```
+
+로컬 업로드 파일은 `GET /uploads/{key}`로 접근할 수 있습니다.
+
+주요 에러: `400 image 필드가 필요합니다.`, `400 이미지 파일만 업로드 가능합니다.`
+
+---
+
+## 8. 장바구니 API
+
+Base Path: `/api/cart`
+
+모든 API 인증 필요입니다.
+
+### 장바구니 조회
+
+`GET /api/cart`
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "cartItemId": "cart_...",
+        "quantity": 2,
+        "product": {
+          "id": "prod_...",
+          "name": "유기농 사과",
+          "currentPrice": 8000,
+          "originalPrice": 10000,
+          "discountRate": 20,
+          "stock": 5,
+          "expiryDate": "2026-06-20",
+          "dDay": 11,
+          "status": "ON_SALE"
+        }
+      }
+    ],
+    "summary": {
+      "totalAmount": 20000,
+      "discountAmount": 4000,
+      "shippingFee": 2500,
+      "finalAmount": 18500
+    },
+    "priceChanged": false
+  }
+}
+```
+
+### 장바구니 상품 추가
+
+`POST /api/cart`
+
+```json
+{
+  "productId": "prod_...",
+  "quantity": 2
+}
+```
+
+응답 `201`
+
+```json
+{
+  "success": true,
+  "data": {
+    "cartItem": {
+      "id": "cart_...",
+      "productId": "prod_...",
+      "quantity": 2
+    }
+  }
+}
+```
+
+주요 에러: `404 상품을 찾을 수 없습니다.`, `400 본인이 등록한 상품은 구매할 수 없습니다.`, `400 장바구니에 담을 수 없는 상품입니다.`, `400 재고가 부족합니다.`
+
+### 장바구니 수량 변경
+
+`PATCH /api/cart/{cartItemId}`
+
+```json
+{
+  "quantity": 3
+}
+```
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "cartItem": {
+      "id": "cart_...",
+      "quantity": 3,
+      "updatedAt": 1780934400000
+    }
+  }
+}
+```
+
+### 장바구니 항목 삭제
+
+`DELETE /api/cart/{cartItemId}`
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "장바구니에서 삭제되었습니다."
+  }
+}
+```
+
+### 장바구니 전체 비우기
+
+`DELETE /api/cart`
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "장바구니가 비워졌습니다."
+  }
+}
+```
+
+---
+
+## 9. 주문 API
+
+Base Path: `/api/orders`
+
+모든 API 인증 필요입니다.
+
+### 주문 생성
+
+`POST /api/orders`
+
+장바구니 항목으로 주문을 생성합니다. 주문 생성 시 장바구니 항목은 삭제되고 상품 재고가 차감됩니다. 결제는 자동 실행되지 않습니다.
+
+```json
+{
+  "cartItemIds": ["cart_1", "cart_2"],
+  "shippingAddress": "서울시 강남구 테헤란로 123"
+}
+```
+
+응답 `201`
+
 ```json
 {
   "success": true,
   "data": {
     "order": {
-      "id": "order123",
+      "id": "ord_...",
       "status": "PENDING",
-      "paymentStatus": "PAID",
-      "paidAt": 1700000001234
-    },
-    "payments": [
-      {
-        "id": "pay123",
-        "sellerId": "seller-profile-1",
-        "sellerShopName": "홍길동 Shop",
-        "token": "USDC-test",
-        "amount": 14000,
-        "status": "COMPLETED",
-        "referenceId": "ord_1234abcd5678efgh9012ijkl",
-        "transferId": "mock-transfer-123"
-      }
-    ]
+      "paymentStatus": "UNPAID",
+      "totalAmount": 20000,
+      "discountAmount": 4000,
+      "shippingFee": 2500,
+      "finalAmount": 18500,
+      "shippingAddress": "서울시 강남구 테헤란로 123",
+      "createdAt": 1780934400000,
+      "updatedAt": 1780934400000,
+      "paidAt": null,
+      "items": [
+        {
+          "productId": "prod_...",
+          "sellerId": "sp_...",
+          "sellerShopName": "판매자 Shop",
+          "name": "유기농 사과",
+          "imageUrl": "/uploads/apple.jpg",
+          "quantity": 2,
+          "price": 8000,
+          "dDay": 11
+        }
+      ],
+      "payments": []
+    }
   }
 }
 ```
 
-**에러 케이스**
+주요 에러: `400 cartItemIds and shippingAddress are required`, `400 선택한 장바구니 항목을 모두 찾을 수 없습니다.`, `400 본인이 등록한 상품은 구매할 수 없습니다.`, `400 재고가 부족합니다.`
 
-| 상태 코드 | 메시지 |
-|---|---|
-| 400 | 결제용 지갑 정보가 없습니다. 먼저 /api/payments/profile 을 등록하세요. |
-| 400 | {판매자명} 판매자의 정산 지갑 정보가 없습니다. |
-| 400 | 취소된 주문은 결제할 수 없습니다. |
+### 내 주문 목록 조회
 
----
+`GET /api/orders`
 
-### GET /api/orders — 주문 목록 조회
+응답 `200`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "orders": [
       {
-        "id": "order123",
+        "id": "ord_...",
         "status": "PENDING",
         "paymentStatus": "UNPAID",
-        "finalAmount": 16500,
-        "createdAt": 1700000000000,
+        "finalAmount": 18500,
+        "createdAt": 1780934400000,
+        "paidAt": null,
         "items": [
           {
-            "productId": "prod123",
+            "productId": "prod_...",
             "name": "유기농 사과",
             "quantity": 2,
-            "price": 7000
+            "price": 8000
           }
         ]
       }
@@ -880,136 +825,173 @@ Authorization: Bearer {accessToken}
 }
 ```
 
----
+### 주문 상세 조회
 
-### GET /api/orders/:id — 주문 상세 조회
+`GET /api/orders/{id}`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
+응답 `200`
 
-**Path Parameters**
-
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 주문 ID |
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "order": {
-      "id": "order123",
+      "id": "ord_...",
       "status": "PENDING",
-      "paymentStatus": "PAID",
-      "totalAmount": 20000,
-      "discountAmount": 6000,
-      "shippingFee": 2500,
-      "finalAmount": 16500,
-      "shippingAddress": "서울시 강남구 테헤란로 123",
-      "createdAt": 1700000000000,
-      "updatedAt": 1700000000000,
-      "paidAt": 1700000001234,
-      "payments": [
-        {
-          "id": "pay123",
-          "sellerId": "seller-profile-1",
-          "sellerShopName": "홍길동 Shop",
-          "token": "USDC-test",
-          "amount": 14000,
-          "status": "COMPLETED",
-          "referenceId": "ord_1234abcd5678efgh9012ijkl",
-          "transferId": "mock-transfer-123"
-        }
-      ],
-      "items": [
-        {
-          "productId": "prod123",
-          "name": "유기농 사과",
-          "imageUrl": "https://example.com/apple.jpg",
-          "quantity": 2,
-          "price": 7000,
-          "dDay": 5
-        }
-      ]
+      "paymentStatus": "UNPAID",
+      "finalAmount": 18500,
+      "items": [],
+      "payments": []
     }
   }
 }
 ```
 
-**에러 케이스**
+주요 에러: `404 주문을 찾을 수 없습니다.`
 
-| 상태 코드 | 메시지           |
-|-------|---------------|
-| 404   | 주문을 찾을 수 없습니다. |
+### 판매자 주문 목록 조회
 
----
+`GET /api/orders/seller`
 
-### PATCH /api/orders/:id/cancel — 주문 취소 (구매자)
+로그인한 사용자의 판매자 프로필 기준으로, 본인 상품이 포함된 주문 목록을 조회합니다.
 
-`PENDING` 상태이면서 아직 결제되지 않은 주문만 취소할 수 있습니다. 취소 시 재고가 자동으로 복구됩니다.
+응답 `200`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 주문 ID |
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
-  "data": { "message": "주문이 취소되었습니다." }
+  "data": {
+    "orders": [
+      {
+        "id": "ord_...",
+        "buyerNickname": "구매자",
+        "status": "PENDING",
+        "paymentStatus": "PAID",
+        "sellerAmount": 16000,
+        "shippingAddress": "서울시 강남구 테헤란로 123",
+        "createdAt": 1780934400000,
+        "updatedAt": 1780934400000,
+        "paidAt": 1780934400000,
+        "items": [
+          {
+            "productId": "prod_...",
+            "name": "유기농 사과",
+            "imageUrl": "/uploads/apple.jpg",
+            "quantity": 2,
+            "price": 8000
+          }
+        ]
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 1,
+      "total": 1,
+      "totalPages": 1
+    }
+  }
 }
 ```
 
-**에러 케이스**
+주요 에러: `403 판매자 등록이 필요합니다.`
 
-| 상태 코드 | 메시지                      |
-|-------|--------------------------|
-| 400   | PENDING 상태의 주문만 취소할 수 있습니다. |
-| 400   | 결제 완료 또는 부분 결제된 주문은 아직 취소할 수 없습니다. |
-| 404   | 주문을 찾을 수 없습니다.            |
+### 주문 결제
 
----
+`POST /api/orders/{id}/pay`
 
-### PATCH /api/orders/:id/status — 주문 상태 변경 (판매자)
+주문 금액을 판매자별로 그룹화하여 stablecoin 결제를 실행합니다. 한 주문에 여러 판매자의 상품이 있으면 판매자별 결제 레코드가 생성됩니다.
 
-> 🔒 **SELLER 또는 ADMIN 역할 필요**  
-> 본인 상품이 포함된 주문만 변경 가능합니다.
-> 결제 완료(`paymentStatus = PAID`) 이후에만 배송 상태를 바꿀 수 있습니다.
+요청 Body 없음
 
-**허용된 상태 전이**
+응답 `200`
 
+```json
+{
+  "success": true,
+  "data": {
+    "order": {
+      "id": "ord_...",
+      "status": "PENDING",
+      "paymentStatus": "PAID",
+      "finalAmount": 18500,
+      "paidAt": 1780934400000,
+      "items": [],
+      "payments": [
+        {
+          "id": "pay_...",
+          "orderId": "ord_...",
+          "sellerId": "sp_...",
+          "sellerShopName": "판매자 Shop",
+          "payeeNickname": "판매자",
+          "payerNickname": null,
+          "token": "USDC-test",
+          "amount": 16000,
+          "status": "COMPLETED",
+          "referenceId": "ord_xxxxxxxxxxxxxxxxxxxxxxxx",
+          "transferId": "mock_xxx",
+          "errorMessage": null,
+          "direction": null,
+          "counterparty": null,
+          "paidAt": 1780934400000,
+          "updatedAt": 1780934400000
+        }
+      ]
+    },
+    "payments": [
+      {
+        "id": "pay_...",
+        "orderId": "ord_...",
+        "sellerId": "sp_...",
+        "sellerShopName": "판매자 Shop",
+        "payeeNickname": "판매자",
+        "payerNickname": null,
+        "token": "USDC-test",
+        "amount": 16000,
+        "status": "COMPLETED",
+        "referenceId": "ord_xxxxxxxxxxxxxxxxxxxxxxxx",
+        "transferId": "mock_xxx",
+        "errorMessage": null,
+        "direction": null,
+        "counterparty": null,
+        "paidAt": 1780934400000,
+        "updatedAt": 1780934400000
+      }
+    ]
+  }
+}
 ```
-PENDING → PREPARING → SHIPPING → DELIVERED
+
+결제 금액은 상품 금액 기준으로 판매자에게 정산됩니다. 현재 배송비(`shippingFee`)는 주문의 `finalAmount`에는 포함되지만 판매자별 stablecoin 정산 그룹에는 포함되지 않습니다.
+
+주요 에러: `404 주문을 찾을 수 없습니다.`, `400 취소된 주문은 결제할 수 없습니다.`, `400 본인이 등록한 상품은 결제할 수 없습니다.`, `400 동일한 지갑으로는 결제할 수 없습니다.`, `400 지갑 잔액이 부족합니다.`, `400 결제할 주문 항목이 없습니다.`
+
+### 주문 취소
+
+`PATCH /api/orders/{id}/cancel`
+
+`PENDING`이고 결제가 완료되지 않은 주문만 취소할 수 있습니다. 취소 시 재고가 복구됩니다.
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "주문이 취소되었습니다."
+  }
+}
 ```
 
-> ⚠️ `PENDING`, `CANCELLED`로는 직접 변경 불가합니다.
+주요 에러: `400 결제 완료 또는 부분 결제된 주문은 아직 취소할 수 없습니다.`, `400 PENDING 상태의 주문만 취소할 수 있습니다.`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
+### 주문 배송 상태 변경
 
-**Path Parameters**
+`PATCH /api/orders/{id}/status`
 
-| 파라미터 | 타입     | 설명    |
-|------|--------|-------|
-| id   | string | 주문 ID |
+판매자가 본인 상품이 포함된 주문의 배송 상태를 변경합니다. 결제가 완료된 주문만 변경할 수 있습니다.
+현재 배송 상태는 주문 단위 상태이므로 여러 판매자가 포함된 주문은 한 판매자가 전체 주문 상태를 변경할 수 없습니다.
 
-**Request Body**
-
-| 필드     | 타입     | 필수 | 설명                                       |
-|----|--------|-----|------------------------------------------|
-| status | string | ✅  | `PREPARING`, `SHIPPING`, `DELIVERED` 중 하나 |
+허용 전이: `PENDING -> PREPARING -> SHIPPING -> DELIVERED`
 
 ```json
 {
@@ -1017,60 +999,163 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-**응답** `200 OK`
+응답 `200`
+
 ```json
 {
   "success": true,
   "data": {
     "order": {
-      "id": "order123",
+      "id": "ord_...",
       "status": "PREPARING",
-      "updatedAt": 1700000000000
+      "paymentStatus": "PAID",
+      "updatedAt": 1780934400000
     }
   }
 }
 ```
 
-**에러 케이스**
-
-| 상태 코드 | 메시지                              |
-|-------|----------------------------------|
-| 400   | status must be PREPARING, SHIPPING, or DELIVERED |
-| 400   | 허용되지 않는 상태 전이입니다.               |
-| 403   | 본인 상품 주문만 변경할 수 있습니다.           |
-| 403   | 판매자 등록이 필요합니다.                   |
-| 404   | 주문을 찾을 수 없습니다.                   |
+주요 에러: `400 status must be PREPARING, SHIPPING, or DELIVERED`, `400 결제가 완료된 주문만 배송 상태를 변경할 수 있습니다.`, `400 여러 판매자가 포함된 주문은 주문 단위 배송 상태를 변경할 수 없습니다.`, `403 본인 상품 주문만 변경할 수 있습니다.`
 
 ---
 
-## 알림/찜 (Alerts)
+## 10. 결제 API
 
-> **Base Path**: `/api/alerts`  
-> 🔒 **모든 엔드포인트 인증 필요**
+Base Path: `/api/payments`
 
-### GET /api/alerts — 알림/찜 목록 조회
+모든 API 인증 필요입니다.
 
-오늘 마감(D-1 ~ D-0) 상품 목록과 내가 찜한 상품 목록을 함께 반환합니다.
+### 내 결제 지갑 조회
 
-**Headers**
+`GET /api/payments/profile`
+
+사용자의 결제 지갑을 조회합니다. 지갑이 없으면 자동 생성됩니다.
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentProfile": {
+      "walletId": "wallet_abcd1234",
+      "token": "USDC-test",
+      "balance": 500000,
+      "updatedAt": 1780934400000
+    }
+  }
+}
 ```
-Authorization: Bearer {accessToken}
+
+### 내 결제 지갑 보장
+
+`POST /api/payments/profile`
+
+지갑을 생성 또는 정규화한 뒤 반환합니다. 요청 Body 없음.
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentProfile": {
+      "walletId": "wallet_abcd1234",
+      "token": "USDC-test",
+      "balance": 500000,
+      "updatedAt": 1780934400000
+    }
+  }
+}
 ```
 
-**응답** `200 OK`
+### 내 결제 내역 조회
+
+`GET /api/payments/history`
+
+구매자로 결제한 내역과 판매자로 정산받은 내역을 함께 조회합니다.
+
+응답 `200`
+
+```json
+{
+  "success": true,
+  "data": {
+    "payments": [
+      {
+        "id": "pay_...",
+        "orderId": "ord_...",
+        "sellerId": "sp_...",
+        "sellerShopName": "판매자 Shop",
+        "payeeNickname": "판매자",
+        "payerNickname": "구매자",
+        "token": "USDC-test",
+        "amount": 16000,
+        "status": "COMPLETED",
+        "referenceId": "ord_xxxxxxxxxxxxxxxxxxxxxxxx",
+        "transferId": "mock_xxx",
+        "errorMessage": null,
+        "direction": "OUT",
+        "counterparty": "판매자 Shop",
+        "paidAt": 1780934400000,
+        "updatedAt": 1780934400000
+      }
+    ]
+  }
+}
+```
+
+### 결제 플로우
+
+1. `POST /api/auth/register` 또는 `POST /api/auth/login`으로 토큰을 받습니다.
+2. 필요하면 `GET /api/payments/profile`로 구매자 지갑과 잔액을 확인합니다.
+3. `POST /api/cart`로 상품을 장바구니에 담습니다.
+4. `POST /api/orders`로 주문을 생성합니다.
+5. `POST /api/orders/{id}/pay`로 stablecoin 결제를 실행합니다.
+6. `GET /api/payments/history` 또는 `GET /api/orders/{id}`로 결제 결과를 확인합니다.
+
+### Stablecoin 연동 메모
+
+환경 변수 `STABLECOIN_DRIVER` 기본값은 `mock`입니다. 실연동은 `stablecoin`으로 설정하고 아래 값을 준비합니다.
+
+| 환경 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| STABLECOIN_DRIVER | `mock` | `mock` 또는 `stablecoin` |
+| STABLECOIN_BASE_URL | `http://127.0.0.1:8090` | stablecoin API Base URL |
+| STABLECOIN_OPERATOR_ID | `operator-default` | 운영자 ID |
+| STABLECOIN_PRIVATE_KEY_PEM | 빈 문자열 | 요청 서명용 private key |
+| STABLECOIN_TIMEOUT_MS | `5000` | 요청 타임아웃 |
+| DEFAULT_PAYMENT_TOKEN | `USDC-test` | 기본 결제 토큰 |
+| DEFAULT_PAYMENT_BALANCE | `500000` | 신규 지갑 기본 잔액 |
+
+---
+
+## 11. 알림/찜 API
+
+Base Path: `/api/alerts`
+
+모든 API 인증 필요입니다.
+
+### 알림 목록 조회
+
+`GET /api/alerts`
+
+찜한 상품 목록과 오늘 마감 특가 목록을 반환합니다.
+
+응답 `200`
+
 ```json
 {
   "success": true,
   "data": {
     "wishAlerts": [
       {
-        "alertId": "alert123",
+        "alertId": "alert_...",
         "isOn": true,
         "product": {
-          "id": "prod123",
+          "id": "prod_...",
           "name": "유기농 사과",
-          "currentPrice": 7000,
-          "status": "EXPIRY_SOON",
+          "currentPrice": 8000,
           "remainSeconds": 86400
         }
       }
@@ -1080,11 +1165,10 @@ Authorization: Bearer {accessToken}
         "alertId": null,
         "isOn": false,
         "product": {
-          "id": "prod456",
-          "name": "신선 딸기",
-          "currentPrice": 5000,
-          "status": "ON_SALE",
-          "remainSeconds": 43200
+          "id": "prod_...",
+          "name": "오늘 마감 상품",
+          "currentPrice": 3000,
+          "remainSeconds": 3600
         }
       }
     ]
@@ -1092,158 +1176,106 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-> ℹ️ `todayDeals`의 `alertId`가 `null`이면 아직 찜하지 않은 상품입니다.
+### 상품 찜 추가
 
----
-
-### POST /api/alerts — 상품 찜하기
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Request Body**
-
-| 필드        | 타입     | 필수 | 설명    |
-|---------|--------|-----|-------|
-| productId | string | ✅  | 상품 ID |
+`POST /api/alerts`
 
 ```json
 {
-  "productId": "prod123"
+  "productId": "prod_..."
 }
 ```
 
-**응답** `201 Created`
+응답 `201`
+
 ```json
 {
   "success": true,
   "data": {
     "alert": {
-      "id": "alert123",
-      "productId": "prod123",
+      "id": "alert_...",
+      "productId": "prod_...",
       "isOn": true
     }
   }
 }
 ```
 
-**에러 케이스**
+주요 에러: `404 상품을 찾을 수 없습니다.`, `409 이미 찜한 상품입니다.`
 
-| 상태 코드 | 메시지            |
-|-------|----------------|
-| 404   | 상품을 찾을 수 없습니다. |
-| 409   | 이미 찜한 상품입니다.   |
+### 찜 알림 토글
 
----
+`PATCH /api/alerts/{alertId}/toggle`
 
-### PATCH /api/alerts/:alertId/toggle — 알림 ON/OFF 토글
+응답 `200`
 
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터    | 타입     | 설명    |
-|---------|--------|-------|
-| alertId | string | 알림 ID |
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
   "data": {
     "alert": {
-      "id": "alert123",
+      "id": "alert_...",
       "isOn": false
     }
   }
 }
 ```
 
-**에러 케이스**
+### 찜 삭제
 
-| 상태 코드 | 메시지           |
-|-------|---------------|
-| 404   | 알림을 찾을 수 없습니다. |
+`DELETE /api/alerts/{alertId}`
 
----
+응답 `200`
 
-### DELETE /api/alerts/:alertId — 찜 해제
-
-**Headers**
-```
-Authorization: Bearer {accessToken}
-```
-
-**Path Parameters**
-
-| 파라미터    | 타입     | 설명    |
-|---------|--------|-------|
-| alertId | string | 알림 ID |
-
-**응답** `200 OK`
 ```json
 {
   "success": true,
-  "data": { "message": "찜이 해제되었습니다." }
+  "data": {
+    "message": "찜이 해제되었습니다."
+  }
 }
 ```
 
-**에러 케이스**
-
-| 상태 코드 | 메시지           |
-|-------|---------------|
-| 404   | 알림을 찾을 수 없습니다. |
-
 ---
 
-## 공통 상수
+## 12. 프론트 연동 예시
 
-### 역할 (Roles)
+### 기본 요청
 
-> ℹ️ 별도의 역할 구분이 없습니다. 모든 사용자는 상품 판매와 구매를 자유롭게 할 수 있습니다.
+```js
+const API_BASE_URL = "http://localhost:3000";
 
-### 상품 카테고리 (Product Categories)
+async function api(path, options = {}) {
+  const token = localStorage.getItem("accessToken");
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
+  });
 
-| 값          | 설명   |
-|-----------|------|
-| `FOOD`     | 식품   |
-| `BEAUTY`   | 뷰티   |
-| `DRINK`    | 음료   |
-| `MEAL_KIT` | 밀키트  |
-| `OTHER`    | 기타   |
+  const body = await res.json();
+  if (!res.ok || !body.success) {
+    throw new Error(body.message || "API request failed");
+  }
+  return body.data;
+}
+```
 
-### 상품 상태 (Product Statuses)
+### 주문 후 결제
 
-| 값             | 설명                     |
-|-------------|------------------------|
-| `ON_SALE`    | 판매 중 (D-Day > 3일)      |
-| `EXPIRY_SOON` | 임박특가 (D-Day ≤ 3일, 재고 있음) |
-| `SOLD_OUT`   | 품절 (재고 0)              |
-| `EXPIRED`    | 유통기한 만료               |
-| `DELETED`    | 삭제됨 (소프트 삭제)          |
+```js
+const orderData = await api("/api/orders", {
+  method: "POST",
+  body: JSON.stringify({
+    cartItemIds: ["cart_1", "cart_2"],
+    shippingAddress: "서울시 강남구 테헤란로 123"
+  })
+});
 
-### 주문 상태 (Order Statuses)
-
-| 값           | 설명       |
-|-----------|----------|
-| `PENDING`   | 결제 대기    |
-| `PREPARING` | 배송 준비 중  |
-| `SHIPPING`  | 배송 중     |
-| `DELIVERED` | 배송 완료    |
-| `CANCELLED` | 취소됨      |
-
-### 기타
-
-| 항목       | 값      |
-|--------|------|
-| 배송비     | 2,500원 |
-| JWT 만료  | 7일    |
-
----
-
-*이 문서는 C-Commerce v1.0.0 기준으로 작성되었습니다.*
+const paymentData = await api(`/api/orders/${orderData.order.id}/pay`, {
+  method: "POST"
+});
+```

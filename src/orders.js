@@ -20,12 +20,21 @@ const selectOrderItems = db.prepare(`
   ORDER BY oi.id ASC
 `);
 const selectUserOrders = db.prepare(`SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC`);
+const selectSellerOrders = db.prepare(`
+  SELECT DISTINCT o.*, u.nickname AS buyer_nickname
+  FROM orders o
+  JOIN order_items oi ON oi.order_id = o.id
+  JOIN users u ON u.id = o.user_id
+  WHERE oi.seller_id = ?
+  ORDER BY o.created_at DESC
+`);
 const selectCartItemsByIds = (userId, cartItemIds) => {
   const placeholders = cartItemIds.map(() => "?").join(", ");
   const statement = db.prepare(`
-    SELECT ci.*, p.name, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.status, p.deleted_at, p.seller_id
+    SELECT ci.*, p.name, p.original_price, p.current_price, p.stock, p.expiry_date, p.image_url, p.status, p.deleted_at, p.seller_id, sp.user_id AS seller_user_id
     FROM cart_items ci
     JOIN products p ON p.id = ci.product_id
+    JOIN seller_profiles sp ON sp.id = p.seller_id
     WHERE ci.user_id = ? AND ci.id IN (${placeholders})
   `);
   return statement.all(userId, ...cartItemIds);
@@ -79,6 +88,36 @@ const formatOrder = (order) => ({
   payments: selectPaymentsByOrderId.all(order.id).map(formatPaymentRecord),
 });
 
+const formatSellerOrderItems = (orderId, sellerId) =>
+  selectOrderItems
+    .all(orderId)
+    .filter((item) => item.seller_id === sellerId)
+    .map((item) => ({
+      productId: item.product_id,
+      name: item.name_snapshot,
+      imageUrl: item.image_url_snapshot || item.image_url,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+
+const formatSellerOrder = (order, sellerId) => {
+  const items = formatSellerOrderItems(order.id, sellerId);
+  const sellerAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return {
+    id: order.id,
+    buyerNickname: order.buyer_nickname,
+    status: order.status,
+    paymentStatus: order.payment_status,
+    sellerAmount,
+    shippingAddress: order.shipping_address,
+    createdAt: order.created_at,
+    updatedAt: order.updated_at,
+    paidAt: order.paid_at,
+    items,
+  };
+};
+
 const createOrderTransaction = db.transaction(({ userId, cartItemIds, shippingAddress }) => {
   const rows = selectCartItemsByIds(userId, cartItemIds);
 
@@ -88,6 +127,9 @@ const createOrderTransaction = db.transaction(({ userId, cartItemIds, shippingAd
 
   for (const row of rows) {
     const state = buildProductState(row);
+    if (row.seller_user_id === userId) {
+      throw new AppError("본인이 등록한 상품은 구매할 수 없습니다.", 400);
+    }
     if (["DELETED", "EXPIRED", "SOLD_OUT"].includes(state.status)) {
       throw new AppError(`${row.name} 상품은 주문할 수 없습니다.`, 400);
     }
@@ -249,6 +291,45 @@ router.get(
         price: item.price,
       })),
     }));
+
+    res.json({
+      success: true,
+      data: {
+        orders,
+        pagination: {
+          page: 1,
+          limit: orders.length || 1,
+          total: orders.length,
+          totalPages: 1,
+        },
+      },
+    });
+  }),
+);
+
+/**
+ * @openapi
+ * /api/orders/seller:
+ *   get:
+ *     summary: 판매자 주문 목록 조회
+ *     description: 로그인한 판매자의 상품이 포함된 주문 목록을 조회합니다.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 판매자 주문 목록 반환
+ */
+router.get(
+  "/seller",
+  asyncHandler(async (req, res) => {
+    const sellerProfile = getSellerProfileByUserId.get(req.user.id);
+    if (!sellerProfile) {
+      throw new AppError("판매자 등록이 필요합니다.", 403);
+    }
+
+    const orders = selectSellerOrders
+      .all(sellerProfile.id)
+      .map((order) => formatSellerOrder(order, sellerProfile.id));
 
     res.json({
       success: true,
@@ -437,6 +518,11 @@ router.patch(
     const sellerOwnsOrder = itemRows.some((item) => item.seller_id === sellerProfile.id);
     if (!sellerOwnsOrder) {
       throw new AppError("본인 상품 주문만 변경할 수 있습니다.", 403);
+    }
+
+    const sellerOwnsEveryItem = itemRows.every((item) => item.seller_id === sellerProfile.id);
+    if (!sellerOwnsEveryItem) {
+      throw new AppError("여러 판매자가 포함된 주문은 주문 단위 배송 상태를 변경할 수 없습니다.", 400);
     }
 
     const transitions = {
