@@ -77,7 +77,7 @@ GET /health
   "nickname": "홍길동",
   "password": "password123"
 }
-```
+```     
 
 **응답** `201 Created`
 ```json
