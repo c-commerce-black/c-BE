@@ -23,7 +23,7 @@
 
 ### 성공 응답
 ```json
-{
+{    
   "success": true,
   "data": { ... }
 }
