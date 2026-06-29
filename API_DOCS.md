@@ -56,12 +56,12 @@ GET /health
 
 ## 인증 (Auth)
 
-> **Base Path**: `/api/auth`
+> **Base Path**: `/api/auth`   
 
 ### POST /api/auth/register — 회원가입
 
 **Request Body**
-
+  
 | 필드       | 타입     | 필수 | 설명                                 |
 |----------|--------|----|------------------------------------|
 | email    | string | ✅  | 이메일 주소                            |
