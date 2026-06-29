@@ -3,7 +3,7 @@
 > **Base URL**: `http://localhost:3000`  
 > **Content-Type**: `application/json`  
 > **인증 방식**: Bearer Token (JWT)d
-
+    
 ---
 
 ## 📋 목차
