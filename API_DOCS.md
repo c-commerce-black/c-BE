@@ -12,7 +12,7 @@
 2. [인증 (Auth)](#인증-auth)         
 3. [상품 (Products)](#상품-products)   
 4. [판매자 상품 관리 (Seller Products)](#판매자-상품-관리-seller-products)
-5. [장바구니 (Cart)](#장바구니-cart)
+5. [장바구니 (Cart)](#장바구니-cart)   
 6. [주문 (Orders)](#주문-orders)
 7. [알림/찜 (Alerts)](#알림찜-alerts) 
 8. [공통 상수](#공통-상수)
